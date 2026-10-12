@@ -1,0 +1,23 @@
+# FireWatch - Backend
+# Python 3.11+ (validado em 3.14.7 / Windows)
+#
+# As versoes abaixo foram fixadas para funcionar com Python 3.14.
+# Em Python 3.11/3.12/3.13 e possivel usar scikit-learn==1.6.0 e
+# pandas==2.2.3 sem perda de compatibilidade.
+
+# --- API ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.13.5
+
+# --- HTTP client (Open-Meteo) ---
+httpx==0.28.1
+
+# --- Machine Learning ---
+scikit-learn==1.9.1
+pandas==2.3.3
+numpy==2.5.3
+joblib==1.6.0
+
+# --- Testes ---
+pytest==8.3.4
