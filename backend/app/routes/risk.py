@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.models.schemas import LocationRequest, RiskResponse
 from app.services.prediction_service import (
@@ -19,7 +19,7 @@ risk_router = APIRouter(prefix="/api/v1", tags=["risco"])
 
 
 @risk_router.post(
-    "/risk",
+    "/prever-risco",
     response_model=RiskResponse,
     summary="Prediz o risco de incendio a partir da localizacao",
     responses={
@@ -47,7 +47,7 @@ async def prever_risco(localizacao: LocationRequest) -> RiskResponse:
             clima=clima,
             latitude=localizacao.latitude,
             longitude=localizacao.longitude,
-            local=localizacao.nome_local,
+            local=None,
         )
     except ModelNotAvailableError as exc:
         logger.error("Modelo indisponivel: %s", exc)
@@ -57,23 +57,3 @@ async def prever_risco(localizacao: LocationRequest) -> RiskResponse:
         ) from exc
 
     return RiskResponse(**resultado)
-
-
-@risk_router.get(
-    "/risk",
-    response_model=RiskResponse,
-    summary="Prediz o risco por query string (latitude/longitude)",
-)
-async def prever_risco_por_query(
-    latitude: float = Query(
-        ..., ge=-90.0, le=90.0, description="Latitude em graus decimais."
-    ),
-    longitude: float = Query(
-        ..., ge=-180.0, le=180.0, description="Longitude em graus decimais."
-    ),
-    local: str | None = Query(default=None, max_length=120),
-) -> RiskResponse:
-    """Variante GET do endpoint de risco, util para testes rapidos com curl."""
-    return await prever_risco(
-        LocationRequest(latitude=latitude, longitude=longitude, nome_local=local)
-    )
