@@ -1,4 +1,4 @@
-"""Testes do fluxo completo da API FireWatch.
+﻿"""Testes do fluxo completo da API FireWatch.
 
 Executar: python -m pytest -q (na pasta backend/)
 """
@@ -16,7 +16,7 @@ if str(RAIZ) not in sys.path:
     sys.path.insert(0, str(RAIZ))
 
 from app.main import app  # noqa: E402
-from app.models.schemas import RiskLevel  # noqa: E402
+from app.services.classificacao import classificar  # noqa: E402
 from app.services.prediction_service import prediction_service  # noqa: E402
 from app.services.weather_service import WeatherService, WeatherServiceError  # noqa: E402
 from ml.features import FEATURES, construir_features  # noqa: E402
@@ -37,9 +37,6 @@ def modelo_disponivel() -> bool:
         return True
     except Exception:  # noqa: BLE001
         return False
-
-
-# --------------------------------------------------------------- features
 
 
 class TestFeatures:
@@ -70,7 +67,6 @@ class TestFeatures:
         assert com_chuva["aridity_index"] < sem_chuva["aridity_index"]
 
     def test_campos_opcionais_ausentes_viram_mediana(self):
-        # A Open-Meteo nem sempre devolve UV/nuvem/sensacao termica.
         features = construir_features(
             {
                 "temperature_2m": 28.0,
@@ -107,35 +103,41 @@ class TestFeatures:
                 "uv_index_max": float("nan"),
             }
         )
-        assert features["uv_index_max"] == features["uv_index_max"]  # nao e NaN
-
-
-# ------------------------------------------------------------- niveis de risco
-
+        assert features["uv_index_max"] == features["uv_index_max"]
 
 class TestNiveisDeRisco:
     @pytest.mark.parametrize(
-        ("probabilidade", "esperado"),
+        ("probabilidade", "esperado_nivel"),
         [
-            (0.00, RiskLevel.BAIXO),
-            (0.24, RiskLevel.BAIXO),
-            (0.25, RiskLevel.MODERADO),
-            (0.49, RiskLevel.MODERADO),
-            (0.50, RiskLevel.ALTO),
-            (0.74, RiskLevel.ALTO),
-            (0.75, RiskLevel.CRITICO),
-            (1.00, RiskLevel.CRITICO),
+            (0.0, "BAIXO"),
+            (0.2999, "BAIXO"),
+            (0.30, "MODERADO"),
+            (0.6999, "MODERADO"),
+            (0.70, "CRÍTICO"),
+            (1.0, "CRÍTICO"),
         ],
     )
-    def test_faixas(self, probabilidade, esperado):
-        assert RiskLevel.from_probability(probabilidade) is esperado
+    def test_faixas(self, probabilidade, esperado_nivel):
+        cls = classificar(probabilidade)
+        assert cls["nivel_risco"] == esperado_nivel
+        assert cls["cor_alerta"] != "#FF0000"
 
-    def test_rotulo_amigavel(self):
-        assert RiskLevel.CRITICO.label == "Critico"
-
-
-# -------------------------------------------------------- servico de clima
-
+    @pytest.mark.parametrize(
+        ("prob", "nivel", "cor"),
+        [
+            (0.0, "BAIXO", "#22C55E"),
+            (0.2999, "BAIXO", "#22C55E"),
+            (0.30, "MODERADO", "#FACC15"),
+            (0.6999, "MODERADO", "#FACC15"),
+            (0.70, "CRÍTICO", "#DC2626"),
+            (1.0, "CRÍTICO", "#DC2626"),
+        ],
+    )
+    def test_classificar_parametrizado(self, prob, nivel, cor):
+        cls = classificar(prob)
+        assert cls["nivel_risco"] == nivel
+        assert cls["cor_alerta"] == cor
+        assert cls["cor_alerta"] != "#FF0000"
 
 class TestWeatherService:
     def test_estimativa_offline_respeita_faixas(self):
@@ -173,10 +175,6 @@ class TestWeatherService:
         servico.limpar_cache()
         assert servico._cache_get((1.0, 2.0)) is None
 
-
-# ------------------------------------------------------------------- API
-
-
 class TestApi:
     def test_raiz(self, cliente):
         resposta = cliente.get("/")
@@ -196,7 +194,8 @@ class TestApi:
 
     def test_schema_do_endpoint_de_risco(self, cliente):
         esquema = cliente.get("/openapi.json").json()
-        rota = esquema["paths"]["/api/v1/risk"]["post"]
+        assert "/api/v1/prever-risco" in esquema["paths"]
+        rota = esquema["paths"]["/api/v1/prever-risco"]["post"]
         assert "application/json" in rota["requestBody"]["content"]
 
     @pytest.mark.parametrize(
@@ -210,66 +209,72 @@ class TestApi:
         ],
     )
     def test_coordenadas_invalidas_retornam_422(self, cliente, corpo):
-        assert cliente.post("/api/v1/risk", json=corpo).status_code == 422
+        assert cliente.post("/api/v1/prever-risco", json=corpo).status_code == 422
 
     def test_predicao_completa(self, cliente, modelo_disponivel):
         if not modelo_disponivel:
             pytest.skip("modelo.pkl ausente: rode python ml/treinamento.py")
 
         resposta = cliente.post(
-            "/api/v1/risk",
-            json={"latitude": -15.79, "longitude": -47.88, "nome_local": "Brasilia"},
+            "/api/v1/prever-risco",
+            json={"latitude": -15.79, "longitude": -47.88},
         )
         assert resposta.status_code == 200, resposta.text
         corpo = resposta.json()
 
-        assert 0.0 <= corpo["probabilidade"] <= 1.0
-        assert 0.0 <= corpo["probabilidade_percentual"] <= 100.0
-        assert corpo["nivel_risco"] in {"baixo", "moderado", "alto", "critico"}
-        assert corpo["descricao"]
-        assert corpo["recomendacao"]
-        assert corpo["local"] == "Brasilia"
+        assert corpo["status"] == "sucesso"
+        assert "localizacao" in corpo
+        assert corpo["localizacao"]["latitude"] == -15.79
+        assert corpo["localizacao"]["longitude"] == -47.88
+        assert "dados_climaticos" in corpo
+        assert "predicao" in corpo
 
-        clima = corpo["clima"]
-        assert -70.0 <= clima["temperatura_c"] <= 65.0
-        assert 0.0 <= clima["umidade_relativa"] <= 100.0
-        assert clima["precipitacao_mm"] >= 0.0
-        assert clima["velocidade_vento_kmh"] >= 0.0
+        pred = corpo["predicao"]
+        assert 0.0 <= pred["probabilidade"] <= 1.0
+        assert pred["porcentagem"].endswith("%")
+        assert pred["nivel_risco"] in {"BAIXO", "MODERADO", "CRÍTICO"}
+        assert pred["cor_alerta"] in {"#22C55E", "#FACC15", "#DC2626"}
+        assert pred["cor_alerta"] != "#FF0000"
+        assert pred["recomendacao"]
 
-        assert corpo["modelo"]["algoritmo"] == "RandomForestClassifier"
-        assert corpo["modelo"]["metricas"]["roc_auc"] > 0.8
+        dc = corpo["dados_climaticos"]
+        assert -70.0 <= dc["temperatura"] <= 65.0
+        assert 0.0 <= dc["umidade_ar"] <= 100.0
+        assert dc["precipitacao_mm"] >= 0.0
+        assert dc["vento_kmh"] >= 0.0
 
     def test_nivel_coerente_com_probabilidade(self, cliente, modelo_disponivel):
         if not modelo_disponivel:
             pytest.skip("modelo.pkl ausente")
 
         resposta = cliente.post(
-            "/api/v1/risk", json={"latitude": -23.55, "longitude": -46.63}
+            "/api/v1/prever-risco", json={"latitude": -23.55, "longitude": -46.63}
         )
         corpo = resposta.json()
-        esperado = RiskLevel.from_probability(corpo["probabilidade"]).value
-        assert corpo["nivel_risco"] == esperado
+        cls = classificar(corpo["predicao"]["probabilidade"])
+        assert corpo["predicao"]["nivel_risco"] == cls["nivel_risco"]
 
     def test_percentual_consistente(self, cliente, modelo_disponivel):
         if not modelo_disponivel:
             pytest.skip("modelo.pkl ausente")
 
         corpo = cliente.post(
-            "/api/v1/risk", json={"latitude": -3.12, "longitude": -60.02}
+            "/api/v1/prever-risco", json={"latitude": -3.12, "longitude": -60.02}
         ).json()
-        assert corpo["probabilidade_percentual"] == pytest.approx(
-            round(corpo["probabilidade"] * 100.0, 1), abs=0.05
-        )
+        p = corpo["predicao"]["probabilidade"]
+        porcent_str = corpo["predicao"]["porcentagem"]
+        assert porcent_str.endswith("%")
+        pct_val = float(porcent_str[:-1])
+        assert abs(pct_val - round(p * 100.0, 1)) < 0.05
 
     def test_variacao_entre_regioes(self, cliente, modelo_disponivel):
-        """Cidades com climas distintos nao devem receber risco identico."""
         if not modelo_disponivel:
             pytest.skip("modelo.pkl ausente")
 
         resultados = {
             cidade: cliente.post(
-                "/api/v1/risk", json={"latitude": lat, "longitude": lon}
-            ).json()["probabilidade"]
+                "/api/v1/prever-risco", json={"latitude": lat, "longitude": lon}
+            ).json()["predicao"]["probabilidade"]
             for cidade, (lat, lon) in {
                 "amazonia": (-3.12, -60.02),
                 "sao_paulo": (-23.55, -46.63),
@@ -277,19 +282,6 @@ class TestApi:
         }
         assert len(set(resultados.values())) > 1
 
-    def test_metodo_get_aceita_query(self, cliente, modelo_disponivel):
-        if not modelo_disponivel:
-            pytest.skip("modelo.pkl ausente")
-
+    def test_get_risk_retorna_404(self, cliente):
         resposta = cliente.get("/api/v1/risk?latitude=-15.79&longitude=-47.88")
-        assert resposta.status_code == 200
-        assert resposta.json()["latitude"] == -15.79
-
-    def test_nome_local_opcional(self, cliente, modelo_disponivel):
-        if not modelo_disponivel:
-            pytest.skip("modelo.pkl ausente")
-
-        corpo = cliente.post(
-            "/api/v1/risk", json={"latitude": -15.79, "longitude": -47.88}
-        ).json()
-        assert corpo["local"] is None
+        assert resposta.status_code == 404

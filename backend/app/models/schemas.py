@@ -1,4 +1,4 @@
-"""Schemas de entrada e saida da API FireWatch."""
+﻿"""Schemas de entrada e saida da API FireWatch."""
 
 from __future__ import annotations
 
@@ -12,37 +12,24 @@ from pydantic import BaseModel, ConfigDict, Field
 class RiskLevel(str, Enum):
     """Niveis de risco de incendio florestal."""
 
-    BAIXO = "baixo"
-    MODERADO = "moderado"
-    ALTO = "alto"
-    CRITICO = "critico"
+    BAIXO = "BAIXO"
+    MODERADO = "MODERADO"
+    CRITICO = "CRÍTICO"
 
     @property
     def label(self) -> str:
         return {
             RiskLevel.BAIXO: "Baixo",
             RiskLevel.MODERADO: "Moderado",
-            RiskLevel.ALTO: "Alto",
-            RiskLevel.CRITICO: "Critico",
+            RiskLevel.CRITICO: "Crítico",
         }[self]
-
-    @classmethod
-    def from_probability(cls, probabilidade: float) -> "RiskLevel":
-        """Converte a probabilidade continua (0.0 - 1.0) em nivel de risco."""
-        if probabilidade >= 0.75:
-            return cls.CRITICO
-        if probabilidade >= 0.50:
-            return cls.ALTO
-        if probabilidade >= 0.25:
-            return cls.MODERADO
-        return cls.BAIXO
 
 
 class LocationRequest(BaseModel):
     """Payload enviado pelo app mobile com a localizacao do usuario."""
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"latitude": -23.5505, "longitude": -46.6333}}
+        json_schema_extra={"example": {"latitude": -20.5386, "longitude": -47.4008}}
     )
 
     latitude: float = Field(
@@ -50,11 +37,6 @@ class LocationRequest(BaseModel):
     )
     longitude: float = Field(
         ..., ge=-180.0, le=180.0, description="Longitude em graus decimais (WGS84)."
-    )
-    nome_local: str | None = Field(
-        default=None,
-        max_length=120,
-        description="Nome opcional do local (cidade/bairro) enviado pelo app.",
     )
 
 
@@ -91,31 +73,31 @@ class WeatherData(BaseModel):
     )
 
 
-class RiskResponse(BaseModel):
-    """Resposta completa do calculo de risco exibida no app."""
-
-    probabilidade: float = Field(
-        ..., ge=0.0, le=1.0, description="Probabilidade de incendio (0.0 a 1.0)."
-    )
-    probabilidade_percentual: float = Field(
-        ..., ge=0.0, le=100.0, description="Probabilidade em porcentagem."
-    )
-    nivel_risco: RiskLevel = Field(..., description="Nivel de risco classificado.")
-    descricao: str = Field(..., description="Descricao textual do nivel de risco.")
-    recomendacao: str = Field(
-        ..., description="Recomendacao de acao para o usuario e a populacao local."
-    )
+class LocalizacaoResponse(BaseModel):
     latitude: float
     longitude: float
-    local: str | None = None
-    clima: WeatherData
-    modelo: dict[str, Any] = Field(
-        default_factory=dict, description="Metadados do modelo de Machine Learning."
-    )
-    gerado_em: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        description="Instante de geracao da resposta (UTC).",
-    )
+
+
+class DadosClimaticosResponse(BaseModel):
+    temperatura: float
+    umidade_ar: float
+    precipitacao_mm: float
+    vento_kmh: float
+
+
+class PredicaoResponse(BaseModel):
+    probabilidade: float = Field(..., ge=0.0, le=1.0)
+    porcentagem: str
+    nivel_risco: str
+    cor_alerta: str
+    recomendacao: str
+
+
+class RiskResponse(BaseModel):
+    status: str = "sucesso"
+    localizacao: LocalizacaoResponse
+    dados_climaticos: DadosClimaticosResponse
+    predicao: PredicaoResponse
 
 
 class HealthResponse(BaseModel):
