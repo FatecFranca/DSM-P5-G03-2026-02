@@ -1,4 +1,4 @@
-﻿"""Integracao com a API Open-Meteo para obtencao de dados climaticos em tempo real.
+"""Integracao com a API Open-Meteo para obtencao de dados climaticos em tempo real.
 
 Fonte: https://api.open-meteo.com/v1/forecast
 Documentacao: https://open-meteo.com/en/docs
