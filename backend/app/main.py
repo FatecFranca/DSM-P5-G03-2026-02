@@ -69,9 +69,8 @@ async def raiz() -> dict[str, str]:
         "versao": __version__,
         "docs": "/docs",
         "health": "/health",
-        "predicao": "POST /api/v1/risk  |  GET /api/v1/risk?latitude=&longitude=",
+        "predicao": "POST /api/v1/prever-risco",
     }
-
 
 @app.get(
     "/health",

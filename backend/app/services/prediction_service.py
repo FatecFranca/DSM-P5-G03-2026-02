@@ -12,7 +12,8 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from app.models.schemas import RiskLevel, WeatherData
+from app.models.schemas import WeatherData
+from app.services.classificacao import RECOMENDACOES, classificar
 from ml.features import FEATURES, construir_features
 
 logger = logging.getLogger(__name__)
@@ -111,16 +112,12 @@ class PredictionService:
         }
 
         features = construir_features(bruto)
-        # DataFrame (e nao ndarray) para preservar os nomes das colunas: o
-        # SimpleImputer foi ajustado com nomes e o scikit-learn emite aviso
-        # -- e perde a validacao de schema -- quando recebe um array cru.
         matriz = pd.DataFrame([[features[nome] for nome in FEATURES]], columns=list(FEATURES))
 
         try:
             if hasattr(modelo, "predict_proba"):
                 probabilidades = modelo.predict_proba(matriz)
                 classes = list(modelo.classes_)
-                # Binario: coluna da classe positiva (risco = 1).
                 coluna = classes.index(1) if 1 in classes else -1
                 return float(np.clip(probabilidades[0][coluna], 0.0, 1.0))
             return float(np.clip(modelo.predict(matriz)[0], 0.0, 1.0))
@@ -135,63 +132,34 @@ class PredictionService:
         local: str | None = None,
     ) -> dict[str, Any]:
         """Executa a predicao completa e monta o dicionario de resposta."""
-        probabilidade = self.prever_probabilidade(clima)
-        nivel = RiskLevel.from_probability(probabilidade)
+        probabilidade = round(float(self.prever_probabilidade(clima)), 3)
+        probabilidade = max(0.0, min(1.0, probabilidade))
+        cls = classificar(probabilidade)
+        nivel_risco = cls["nivel_risco"]
+        cor_alerta = cls["cor_alerta"]
+        recomendacao = RECOMENDACOES[nivel_risco]
+        porcentagem = f"{probabilidade * 100.0:.1f}%"
+
         return {
-            "probabilidade": probabilidade,
-            "probabilidade_percentual": round(probabilidade * 100.0, 1),
-            "nivel_risco": nivel,
-            "descricao": DESCRICOES[nivel],
-            "recomendacao": RECOMENDACOES[nivel],
-            "latitude": latitude,
-            "longitude": longitude,
-            "local": local,
-            "clima": clima,
-            "modelo": self.metadados(),
-            "gerado_em": datetime.now(timezone.utc),
+            "status": "sucesso",
+            "localizacao": {
+                "latitude": latitude,
+                "longitude": longitude,
+            },
+            "dados_climaticos": {
+                "temperatura": float(clima.temperatura_c),
+                "umidade_ar": float(clima.umidade_relativa),
+                "precipitacao_mm": float(clima.precipitacao_mm),
+                "vento_kmh": float(clima.velocidade_vento_kmh),
+            },
+            "predicao": {
+                "probabilidade": probabilidade,
+                "porcentagem": porcentagem,
+                "nivel_risco": nivel_risco,
+                "cor_alerta": cor_alerta,
+                "recomendacao": recomendacao,
+            },
         }
-
-
-DESCRICOES: dict[RiskLevel, str] = {
-    RiskLevel.BAIXO: (
-        "Condicoes climaticas favoraveis ao controle da umidade do ambiente. "
-        "Risco reduzido de inicio e propagacao de focos de incendio."
-    ),
-    RiskLevel.MODERADO: (
-        "Condicoes climaticas intermediarias. Zonas florestais podem apresentar "
-        "pontos isolados de inflamabilidade se houver atividade humana com fogo."
-    ),
-    RiskLevel.ALTO: (
-        "Ambiente seco e/ou ventoso. Favorece a propagacao de incendio emareas "
-        "florestais. Cuidado redobrado com qualquer fonte de calor."
-    ),
-    RiskLevel.CRITICO: (
-        "Condicoes severas para o inicio de incendio: ar muito seco, vento forte "
-        "e calor elevado. Qualquer foco tem alto potencial de se tornar um grande "
-        "incendio."
-    ),
-}
-
-RECOMENDACOES: dict[RiskLevel, str] = {
-RiskLevel.BAIXO: (
-        "Nenhuma acao urgente. Evite jogar lixo e faiscas e mantenha-se atento "
-        "a avisos oficiais."
-    ),
-RiskLevel.MODERADO: (
-        "Nao realizar queimadas nem usar fogo. Confira se o terreno ao redor da "
-        "casa esta limpo e umido o suficiente para impedir a propagacao."
-    ),
-RiskLevel.ALTO: (
-        "Suspenda qualquer atividade com fogo e evite utilizar lenha acesa. "
-        "Mantenha mangueiras e extintores prontos e evite circular em estradas "
-        "de terra com vegetacao seca."
-    ),
-RiskLevel.CRITICO: (
-        "Alerta maximo. Nao acenda fogueiras, mantenha-se informado nos canais "
-        "oficiais (Defesa Civil / IBAMA) e fique preparado para evacuar caso haja "
-        "ordem de evacuacao na sua regiao."
-    ),
-}
 
 
 prediction_service = PredictionService()
