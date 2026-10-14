@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
+from app.config import settings
 from app.models.schemas import HealthResponse
 from app.routes.risk import risk_router
 from app.services.prediction_service import ModelNotAvailableError, prediction_service
@@ -52,7 +53,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -71,6 +72,7 @@ async def raiz() -> dict[str, str]:
         "health": "/health",
         "predicao": "POST /api/v1/prever-risco",
     }
+
 
 @app.get(
     "/health",
