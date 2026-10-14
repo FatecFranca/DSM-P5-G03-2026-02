@@ -37,6 +37,15 @@ abstract final class AppColors {
   static const Color darkSurfaceHigh = Color(0xFF2B2420);
   static const Color darkBorder = Color(0xFF3A312C);
 
+  // Splash (identidade escura, escopada apenas à tela inicial)
+  static const Color splashBackground = Color(0xFF151515);
+  static const Color splashBorder = Color(0xFF3FC8D4);
+  static const Color splashButton = Color(0xFFFF6818);
+  static const Color splashButtonText = Color(0xFF151515);
+  static const Color splashTextPrimary = Color(0xFFFFFFFF);
+  static const Color splashTextSecondary = Color(0xFFB5B5B5);
+  static const Color splashTextMuted = Color(0xFF6E6E6E);
+
   // Token de risco para texto
   static Color riskTextColor(RiskTone tone) => switch (tone) {
         RiskTone.low => riskLow,

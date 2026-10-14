@@ -11,11 +11,11 @@ void main() {
   testWidgets('abre na splash e navega para o dashboard', (tester) async {
     await _pumpApp(tester);
 
-    // Splash exibe nome e slogan.
-    expect(find.text('Firewatch'), findsWidgets);
+    // Splash exibe nome e frase.
+    expect(find.text('firewatch'), findsWidgets);
 
-    // Avança o timer da splash.
-    await tester.pump(const Duration(seconds: 3));
+    // Toca em "Começar" para avançar.
+    await tester.tap(find.text('Começar'));
     await tester.pumpAndSettle();
 
     // Dashboard renderizado.
@@ -26,7 +26,7 @@ void main() {
 
   testWidgets('barra de navegação alterna entre telas', (tester) async {
     await _pumpApp(tester);
-    await tester.pump(const Duration(seconds: 3));
+    await tester.tap(find.text('Começar'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Previsão'));
