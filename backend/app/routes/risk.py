@@ -1,4 +1,4 @@
-"""Endpoints de consulta de risco de incendio florestal."""
+﻿"""Endpoints de consulta de risco de incendio florestal."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ async def prever_risco(localizacao: LocationRequest) -> RiskResponse:
         logger.error("Falha na Open-Meteo: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Nao foi possivel obter dados climaticos: {exc}",
+            detail="Serviço de clima indisponível no momento. Tente novamente em instantes.",
         ) from exc
 
     try:
