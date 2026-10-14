@@ -1,4 +1,4 @@
-﻿"""Serviço de classificação de risco de incêndio em três faixas."""
+"""Serviço de classificação de risco de incêndio em três faixas."""
 
 from __future__ import annotations
 
