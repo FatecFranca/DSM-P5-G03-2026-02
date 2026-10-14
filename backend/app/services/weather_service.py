@@ -1,4 +1,4 @@
-"""Integracao com a API Open-Meteo para obtencao de dados climaticos em tempo real.
+﻿"""Integracao com a API Open-Meteo para obtencao de dados climaticos em tempo real.
 
 Fonte: https://api.open-meteo.com/v1/forecast
 Documentacao: https://open-meteo.com/en/docs
@@ -13,11 +13,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+from app.config import settings
 from app.models.schemas import WeatherData
 
 logger = logging.getLogger(__name__)
-
-OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 CURRENT_FIELDS = (
     "temperature_2m",
@@ -40,19 +39,20 @@ LIMITE_VENTO_KMH = (-1.0, 250.0)
 class WeatherServiceError(RuntimeError):
     """Falha ao obter dados climaticos da Open-Meteo."""
 
-
 class WeatherService:
     """Cliente da Open-Meteo com cache curto e modo degradado (fallback)."""
 
     def __init__(
         self,
-        timeout: float = 10.0,
-        cache_ttl: float = 300.0,
-        permitir_fallback: bool = True,
+        timeout: float | None = None,
+        cache_ttl: float | None = None,
+        permitir_fallback: bool | None = None,
     ) -> None:
-        self.timeout = timeout
-        self.cache_ttl = cache_ttl
-        self.permitir_fallback = permitir_fallback
+        self.timeout = timeout if timeout is not None else settings.OPEN_METEO_TIMEOUT
+        self.cache_ttl = cache_ttl if cache_ttl is not None else settings.CACHE_TTL_SEGUNDOS
+        self.permitir_fallback = (
+            permitir_fallback if permitir_fallback is not None else settings.PERMITIR_FALLBACK_CLIMA
+        )
         self._cache: dict[tuple[float, float], tuple[float, WeatherData]] = {}
 
     # ------------------------------------------------------------------ cache
@@ -88,11 +88,7 @@ class WeatherService:
         }
 
     async def obter_clima(self, latitude: float, longitude: float) -> WeatherData:
-        """Retorna os dados climaticos atuais para a coordenada informada.
-
-        Usa o cache quando disponivel; em caso de falha de rede, cai para uma
-        estimacao climatologica local para que o app continue funcional.
-        """
+        """Retorna os dados climaticos atuais para a coordenada informada."""
         chave = (round(latitude, 3), round(longitude, 3))
         em_cache = self._cache_get(chave)
         if em_cache is not None:
@@ -101,22 +97,55 @@ class WeatherService:
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as cliente:
-                resposta = await cliente.get(
-                    OPEN_METEO_URL, params=self._params(latitude, longitude)
-                )
-                resposta.raise_for_status()
+                resposta = await self._fetch_with_retry(cliente, latitude, longitude)
                 payload = resposta.json()
             dados = self._parse(payload)
-        except Exception as exc:  # noqa: BLE001 - fallback degradado
+        except Exception as exc:  # noqa: BLE001
             if not self.permitir_fallback:
                 raise WeatherServiceError(f"Falha ao consultar Open-Meteo: {exc}") from exc
             logger.warning("Open-Meteo indisponivel (%s). Usando estimativa local.", exc)
             dados = self.estimar_clima(
                 latitude, longitude, hora=datetime.now(timezone.utc)
             )
+            return dados
 
         self._cache_set(chave, dados)
         return dados
+
+    async def _fetch_with_retry(
+        self, cliente: httpx.AsyncClient, latitude: float, longitude: float
+    ) -> httpx.Response:
+        tentativa = 0
+        last_exc: Exception | None = None
+        while tentativa <= 1:
+            try:
+                resposta = await cliente.get(
+                    settings.OPEN_METEO_URL, params=self._params(latitude, longitude)
+                )
+                if tentativa == 0 and resposta.status_code >= 500:
+                    tentativa += 1
+                    await self._sleep(0.5)
+                    continue
+                resposta.raise_for_status()
+                return resposta
+            except httpx.RequestError as exc:
+                last_exc = exc
+                if tentativa == 0:
+                    tentativa += 1
+                    await self._sleep(0.5)
+                    continue
+                break
+            except httpx.HTTPStatusError as exc:
+                # HTTP 4xx nao tem retry
+                raise
+        if last_exc is not None:
+            raise last_exc
+        raise WeatherServiceError("Falha ao consultar Open-Meteo")
+
+    async def _sleep(self, seg: float) -> None:
+        import asyncio
+
+        await asyncio.sleep(seg)
 
     # ------------------------------------------------------------- parse/util
 
@@ -143,38 +172,33 @@ class WeatherService:
             cobertura_nuvens=_numero(current.get("cloud_cover")),
             horario=_parse_hora(current.get("time")),
         )
-        self._validar(dados)
+        self._sanitizar(dados)
         return dados
 
-    def _validar(self, dados: WeatherData) -> None:
-        problemas = []
-        if not LIMITE_TEMPERATURA_C[0] <= dados.temperatura_c <= LIMITE_TEMPERATURA_C[1]:
-            problemas.append(f"temperatura={dados.temperatura_c}")
-        if not LIMITE_UMIDADE[0] <= dados.umidade_relativa <= LIMITE_UMIDADE[1]:
-            problemas.append(f"umidade={dados.umidade_relativa}")
-        if not LIMITE_PRECIPITACAO[0] <= dados.precipitacao_mm <= LIMITE_PRECIPITACAO[1]:
-            problemas.append(f"precipitacao={dados.precipitacao_mm}")
-        if not LIMITE_VENTO_KMH[0] <= dados.velocidade_vento_kmh <= LIMITE_VENTO_KMH[1]:
-            problemas.append(f"vento={dados.velocidade_vento_kmh}")
-        if problemas:
-            raise WeatherServiceError(
-                "Dados climaticos fora dos limites esperados: " + ", ".join(problemas)
-            )
+    def _sanitizar(self, dados: WeatherData) -> None:
+        def _recorta(v: float | None, faixa: tuple[float, float]) -> float | None:
+            if v is None:
+                return v
+            inf, sup = faixa
+            return max(inf, min(sup, v))
 
-    # -------------------------------------------------------------- fallback
+        dados.temperatura_c = _recorta(dados.temperatura_c, LIMITE_TEMPERATURA_C)  # type: ignore[assignment]
+        dados.umidade_relativa = _recorta(dados.umidade_relativa, LIMITE_UMIDADE)  # type: ignore[assignment]
+        dados.precipitacao_mm = _recorta(dados.precipitacao_mm, LIMITE_PRECIPITACAO)  # type: ignore[assignment]
+        dados.velocidade_vento_kmh = _recorta(dados.velocidade_vento_kmh, LIMITE_VENTO_KMH)  # type: ignore[assignment]
+        dados.rajada_vento_kmh = _recorta(dados.rajada_vento_kmh, LIMITE_VENTO_KMH)
+        dados.sensacao_termica_c = _recorta(dados.sensacao_termica_c, LIMITE_TEMPERATURA_C)
+        dados.ponto_de_orvalho_c = _recorta(dados.ponto_de_orvalho_c, LIMITE_TEMPERATURA_C)
+        dados.cobertura_nuvens = _recorta(dados.cobertura_nuvens, (-0.5, 101.0))
 
     def estimar_clima(
         self,
         latitude: float,
-        longitude: float,
+        longitude: float,  # noqa: ARG002
         hora: datetime | None = None,
     ) -> WeatherData:
-        """Estimativa climatologica simples quando a Open-Meteo nao responde.
-
-        Usa apenas latitude (tendencia termica) e sazonalidade mensal. Serve para
-        manter o app operacional em modo offline, nao para uso operacional real.
-        """
-        hora = hora or datetime.now(timezone.utc)
+        if hora is None:
+            hora = datetime.now(timezone.utc)
         mes = hora.month
 
         # Media anual aproximada: ~27 C no equador caindo para ~0 C nas altas latitudes.
@@ -200,7 +224,6 @@ class WeatherService:
             cobertura_nuvens=None,
             horario=hora,
         )
-
 
 # --------------------------------------------------------------- utilitarios
 
