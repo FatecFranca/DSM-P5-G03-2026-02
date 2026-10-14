@@ -1,4 +1,4 @@
-﻿"""Schemas de entrada e saida da API FireWatch."""
+"""Schemas de entrada e saida da API FireWatch."""
 
 from __future__ import annotations
 

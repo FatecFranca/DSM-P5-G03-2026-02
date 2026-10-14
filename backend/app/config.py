@@ -1,4 +1,4 @@
-﻿"""Configuração da aplicação via variáveis de ambiente."""
+"""Configuração da aplicação via variáveis de ambiente."""
 
 from __future__ import annotations
 
