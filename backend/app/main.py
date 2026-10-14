@@ -1,4 +1,4 @@
-﻿"""FireWatch API - classificacao e predicao de risco de incendio florestal.
+"""FireWatch API - classificacao e predicao de risco de incendio florestal.
 
 Fluxo: GPS (app mobile) -> Open-Meteo -> Random Forest -> nivel de risco -> app.
 """

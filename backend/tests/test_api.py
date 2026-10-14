@@ -1,4 +1,4 @@
-﻿"""Testes do fluxo completo da API FireWatch.
+"""Testes do fluxo completo da API FireWatch.
 
 Executar: python -m pytest -q (na pasta backend/)
 """

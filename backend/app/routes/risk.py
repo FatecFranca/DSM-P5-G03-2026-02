@@ -1,4 +1,4 @@
-﻿"""Endpoints de consulta de risco de incendio florestal."""
+"""Endpoints de consulta de risco de incendio florestal."""
 
 from __future__ import annotations
 
