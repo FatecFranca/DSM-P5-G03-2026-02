@@ -9,6 +9,7 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.13.5
+pydantic-settings==2.11.0
 
 # --- HTTP client (Open-Meteo) ---
 httpx==0.28.1
@@ -20,4 +21,4 @@ numpy==2.5.3
 joblib==1.6.0
 
 # --- Testes ---
-pytest==8.3.4pydantic-settings==2.11.0
+pytest==8.3.4
