@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     PERMITIR_FALLBACK_CLIMA: bool = False
     CORS_ORIGINS: str | List[str] = ["*"]
 
+    # Configurações do banco de dados
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_NAME: str = "firewatch_db"
+    DB_USER: str = "postgres"
+    DB_PASSWORD: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

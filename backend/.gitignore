@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+
+# Environment variables
+.env
+.env.local
+.env.production
+.secret
+
+# Virtual environments
+venv/
+env/
+ENV/
+venv.bak/
+env.bak/
+
+# ML models and datasets
+*.pkl
+*.h5
+*.hdf5
+*model*
+*checkpoint*
+
+# IDE / Editor
+.vscode/
+.idea/
+*.tsx
+*.ts
+*.nextjs
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Packaging
+dist/
+build/
+*.egg-info/
+
+# Databases
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+.DS_Store?
+ebakup/
+Thumbs.db
