@@ -5,6 +5,9 @@
 # Em Python 3.11/3.12/3.13 e possivel usar scikit-learn==1.6.0 e
 # pandas==2.2.3 sem perda de compatibilidade.
 
+# --- Database ---
+asyncpg==0.29.0
+
 # --- API ---
 fastapi==0.115.6
 uvicorn[standard]==0.34.0

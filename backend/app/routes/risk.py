@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.config import settings
+from app.db import db
 from app.models.schemas import LocationRequest, RiskResponse
 from app.services.prediction_service import (
     ModelNotAvailableError,
@@ -16,6 +18,12 @@ from app.services.weather_service import WeatherServiceError, weather_service
 logger = logging.getLogger(__name__)
 
 risk_router = APIRouter(prefix="/api/v1", tags=["risco"])
+
+
+async def get_db():
+    """Dependency que fornece uma conexão do pool de DB."""
+    async with db.get_connection() as conn:
+        yield conn
 
 
 @risk_router.post(
@@ -57,3 +65,16 @@ async def prever_risco(localizacao: LocationRequest) -> RiskResponse:
         ) from exc
 
     return RiskResponse(**resultado)
+
+
+@risk_router.get("/db-test", tags=["geral"], summary="Testa conexão com banco de dados")
+async def db_test(conn=Depends(get_db)):
+    """Testa a conexão com o banco de dados."""
+    try:
+        result = await conn.fetchval("SELECT current_user, current_database()")
+        return {"status": "ok", "usuario": str(result[0]), "banco": str(result[1])}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao conectar com o banco de dados: {exc}",
+        )
