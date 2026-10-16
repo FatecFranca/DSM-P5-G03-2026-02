@@ -40,6 +40,9 @@ dependencies:
   fl_chart: ^0.69.2
   flutter_svg: ^2.0.16
   http: ^1.6.0
+  geolocator: ^13.0.2
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:
