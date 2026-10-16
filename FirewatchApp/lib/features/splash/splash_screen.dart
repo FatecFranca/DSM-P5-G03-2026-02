@@ -4,13 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
-import '../../shared/widgets/flame_mark.dart';
+import '../../shared/widgets/flame_logo.dart';
 
-/// Tela inicial (splash) do Firewatch.
+/// Tela inicial (boas-vindas) do Firewatch.
 ///
-/// Marca na região superior, botão "Começar" na região inferior e a
-/// identificação do projeto próxima à borda. Ao tocar em "Começar" navega para
-/// a tela principal existente.
+/// Fundo quase preto com um brilho radial em tons de marrom/laranja atrás do
+/// logotipo, seguido pelo nome, frase de apresentação, o botão "Começar" e a
+/// identificação do projeto. O botão leva à tela principal existente
+/// (onboarding de localização), preservando a navegação atual.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -66,9 +67,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     _glowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 2600),
     )..repeat(reverse: true);
-    _glow = Tween<double>(begin: 0.55, end: 1).animate(
+    _glow = Tween<double>(begin: 0.6, end: 1).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
 
@@ -82,79 +83,79 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  /// Segue para a tela principal existente (fluxo de localização).
   void _continue() {
     if (_navigated || !mounted) return;
     _navigated = true;
-    context.go('/');
+    context.go('/onboarding/location');
   }
 
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.sizeOf(context);
-    final logoSize = (media.width * 0.30).clamp(96.0, 150.0);
-    final nameSize = (media.width * 0.062).clamp(22.0, 26.0);
-    final phraseSize = (media.width * 0.028).clamp(10.0, 11.0);
-    final buttonWidth = (media.width * 0.75).clamp(200.0, 320.0);
-    final buttonHeight = (media.height * 0.058).clamp(42.0, 46.0);
+    final logoSize = (media.width * 0.30).clamp(112.0, 156.0);
+    final nameSize = (media.width * 0.118).clamp(34.0, 42.0);
+    final phraseSize = (media.width * 0.044).clamp(14.0, 16.0);
 
     return Scaffold(
       backgroundColor: AppColors.splashBackground,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: AppColors.splashBorder.withValues(alpha: 0.45),
-                width: 1,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Column(
-                children: [
-                  SizedBox(height: media.height * 0.10),
-                  _BrandBlock(
-                    logoSize: logoSize,
-                    nameSize: nameSize,
-                    phraseSize: phraseSize,
-                    logoFade: _logoFade,
-                    logoScale: _logoScale,
-                    textFade: _textFade,
-                    textSlide: _textSlide,
-                    glow: _glow,
-                  ),
-                  const Spacer(),
-                  _StartButton(
-                    width: buttonWidth,
-                    height: buttonHeight,
-                    label: AppConstants.splashStartLabel,
-                    onPressed: _continue,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    AppConstants.splashProjectLabel,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.mono(
-                      AppColors.splashTextMuted,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 1.2,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 12,
+                    ),
+                    child: Column(
+                      children: [
+                        const Spacer(flex: 3),
+                        _BrandBlock(
+                          logoSize: logoSize,
+                          nameSize: nameSize,
+                          phraseSize: phraseSize,
+                          logoFade: _logoFade,
+                          logoScale: _logoScale,
+                          textFade: _textFade,
+                          textSlide: _textSlide,
+                          glow: _glow,
+                        ),
+                        const Spacer(flex: 4),
+                        _StartButton(
+                          height: 56,
+                          label: AppConstants.splashStartLabel,
+                          onPressed: _continue,
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          AppConstants.splashProjectLabel,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.mono(
+                            AppColors.splashTextMuted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 1.6,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 6),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
   }
 }
 
-/// Chama com brilho, nome e frase de apresentação.
+/// Chama com olho, brilho radial e a frase de apresentação.
 class _BrandBlock extends StatelessWidget {
   const _BrandBlock({
     required this.logoSize,
@@ -183,25 +184,31 @@ class _BrandBlock extends StatelessWidget {
       children: [
         SizedBox(
           width: logoSize * 2,
-          height: logoSize * 2,
+          height: logoSize * 1.9,
           child: Stack(
             alignment: Alignment.center,
             children: [
+              // Iluminação radial discreta em tons de marrom e laranja escuro.
               AnimatedBuilder(
                 animation: glow,
                 builder: (context, child) {
+                  final reach = 1.35 + 0.22 * glow.value;
                   return Container(
-                    width: logoSize * (1.6 + 0.25 * glow.value),
-                    height: logoSize * (1.6 + 0.25 * glow.value),
+                    width: logoSize * reach,
+                    height: logoSize * reach,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          AppColors.orange.withValues(
-                            alpha: 0.32 * glow.value,
+                          AppColors.splashGlowOrange.withValues(
+                            alpha: 0.30 * glow.value,
                           ),
-                          AppColors.orange.withValues(alpha: 0),
+                          AppColors.splashGlowBrown.withValues(
+                            alpha: 0.20 * glow.value,
+                          ),
+                          AppColors.splashGlowBrown.withValues(alpha: 0),
                         ],
+                        stops: const [0, 0.45, 1],
                       ),
                     ),
                   );
@@ -211,23 +218,24 @@ class _BrandBlock extends StatelessWidget {
                 opacity: logoFade,
                 child: ScaleTransition(
                   scale: logoScale,
-                  child: FlameMark(size: logoSize),
+                  child: FlameLogo(size: logoSize),
                 ),
               ),
             ],
           ),
         ),
+        const SizedBox(height: 24),
         Text(
           AppConstants.appName.toLowerCase(),
           textAlign: TextAlign.center,
           style: AppTypography.inter(
             AppColors.splashTextPrimary,
             fontSize: nameSize,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         SlideTransition(
           position: textSlide,
           child: FadeTransition(
@@ -251,13 +259,11 @@ class _BrandBlock extends StatelessWidget {
 /// Botão principal "Começar" com feedback visual de pressão.
 class _StartButton extends StatefulWidget {
   const _StartButton({
-    required this.width,
     required this.height,
     required this.label,
     required this.onPressed,
   });
 
-  final double width;
   final double height;
   final String label;
   final VoidCallback onPressed;
@@ -271,14 +277,14 @@ class _StartButtonState extends State<_StartButton> {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(widget.height / 2);
+    final radius = BorderRadius.circular(16);
 
     return AnimatedScale(
-      scale: _pressed ? 0.96 : 1,
+      scale: _pressed ? 0.97 : 1,
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOut,
       child: SizedBox(
-        width: widget.width,
+        width: double.infinity,
         height: widget.height,
         child: Material(
           color: AppColors.splashButton,
@@ -296,8 +302,8 @@ class _StartButtonState extends State<_StartButton> {
                 widget.label,
                 style: AppTypography.inter(
                   AppColors.splashButtonText,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),

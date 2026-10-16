@@ -11,9 +11,9 @@ abstract final class AppConstants {
   static const String version = '1.0.0';
 
   // Splash
-  static const String splashPhrase = 'veja o risco antes do fogo.';
+  static const String splashPhrase = 'Veja o risco antes do fogo.';
   static const String splashStartLabel = 'Começar';
-  static const String splashProjectLabel = 'PROJETO INTEGRADOR - 5º SEMESTRE';
+  static const String splashProjectLabel = 'PROJETO INTEGRADOR • 5º SEMESTRE';
 
   /// Sinaliza dados demonstrativos até a integração com backend.
   static const String demoDisclaimer = 'Dados demonstrativos';
