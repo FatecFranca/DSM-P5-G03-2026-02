@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Permite HTTP em texto puro apenas para a API do FireWatch hospedada na VM. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">57.156.67.130</domain>
+    </domain-config>
+</network-security-config>
