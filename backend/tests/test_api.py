@@ -16,10 +16,18 @@ if str(RAIZ) not in sys.path:
     sys.path.insert(0, str(RAIZ))
 
 from app.main import app  # noqa: E402
-from app.services.classificacao import classificar  # noqa: E402
+from app.services.classificacao import (  # noqa: E402
+    CLASSES,
+    CORES,
+    NIVEIS,
+    classe_do_codigo,
+    codigo_do_indice,
+    cor_do_codigo,
+    nivel_do_codigo,
+)
 from app.services.prediction_service import prediction_service  # noqa: E402
 from app.services.weather_service import WeatherService, WeatherServiceError  # noqa: E402
-from ml.features import FEATURES, construir_features  # noqa: E402
+from ml.features import FEATURES, construir_features, padronizar_dias_sem_chuva  # noqa: E402
 
 pytestmark = pytest.mark.filterwarnings("ignore::UserWarning")
 
@@ -41,103 +49,91 @@ def modelo_disponivel() -> bool:
 
 class TestFeatures:
     def test_ordem_canonica(self):
-        assert FEATURES[0] == "temperature_2m"
+        assert FEATURES[0] == "temp_max"
         assert len(FEATURES) == len(set(FEATURES))
 
-    def test_vpd_cresce_com_umidade(self):
+    def test_dias_sem_chuva_cresce_com_os_dias(self):
         base = {
-            "temperature_2m": 32.0,
-            "relative_humidity_2m": 20.0,
-            "precipitation": 0.0,
-            "wind_speed_10m": 10.0,
+            "temp_max": 32.0,
+            "temp_min": 22.0,
+            "umidade": 30.0,
+            "precipitacao_mm": 0.0,
+            "velocidade_vento": 20.0,
         }
-        seco = construir_features(base)
-        umido = construir_features({**base, "relative_humidity_2m": 80.0})
-        assert seco["vpd_kpa"] > umido["vpd_kpa"]
-        assert umido["vpd_kpa"] >= 0.0
+        seco = construir_features({**base, "dias_sem_chuva": 40.0})
+        umido = construir_features({**base, "dias_sem_chuva": 0.0})
+        assert seco["dias_sem_chuva"] > umido["dias_sem_chuva"]
+        assert umido["dias_sem_chuva"] == round(padronizar_dias_sem_chuva(0.0), 4)
 
-    def test_indice_aridez_cai_com_chuva(self):
-        base = {
-            "temperature_2m": 33.0,
-            "relative_humidity_2m": 30.0,
-            "wind_speed_10m": 30.0,
-        }
-        sem_chuva = construir_features({**base, "precipitation": 0.0})
-        com_chuva = construir_features({**base, "precipitation": 15.0})
-        assert com_chuva["aridity_index"] < sem_chuva["aridity_index"]
-
-    def test_campos_opcionais_ausentes_viram_mediana(self):
-        features = construir_features(
-            {
-                "temperature_2m": 28.0,
-                "relative_humidity_2m": 55.0,
-                "precipitation": 0.0,
-                "wind_speed_10m": 12.0,
-            }
-        )
-        assert features["uv_index_max"] > 0
-        assert features["cloud_cover"] > 0
+    def test_campos_ausentes_viram_omissao(self):
+        features = construir_features({})
+        assert set(features) == set(FEATURES)
         assert all(isinstance(v, float) for v in features.values())
 
     def test_valores_fora_de_faixa_sao_recortados(self):
         features = construir_features(
             {
-                "temperature_2m": 500.0,
-                "relative_humidity_2m": 250.0,
-                "precipitation": -5.0,
-                "wind_speed_10m": 9999.0,
+                "temp_max": 500.0,
+                "temp_min": -500.0,
+                "umidade": 250.0,
+                "precipitacao_mm": -5.0,
+                "velocidade_vento": 9999.0,
+                "dias_sem_chuva": -10.0,
             }
         )
-        assert features["temperature_2m"] == 60.0
-        assert features["relative_humidity_2m"] == 100.0
-        assert features["precipitation"] == 0.0
-        assert features["wind_speed_10m"] == 200.0
+        assert features["temp_max"] == 60.0
+        assert features["temp_min"] == -30.0
+        assert features["umidade"] == 100.0
+        assert features["precipitacao_mm"] == 0.0
+        assert features["velocidade_vento"] == 200.0
+        assert features["dias_sem_chuva"] == round(padronizar_dias_sem_chuva(0.0), 4)
 
     def test_nan_e_tratado(self):
         features = construir_features(
             {
-                "temperature_2m": 25.0,
-                "relative_humidity_2m": 60.0,
-                "precipitation": 0.0,
-                "wind_speed_10m": 10.0,
-                "uv_index_max": float("nan"),
+                "temp_max": 25.0,
+                "temp_min": 15.0,
+                "umidade": 60.0,
+                "precipitacao_mm": 0.0,
+                "velocidade_vento": 10.0,
+                "dias_sem_chuva": float("nan"),
             }
         )
-        assert features["uv_index_max"] == features["uv_index_max"]
+        assert features["dias_sem_chuva"] == features["dias_sem_chuva"]
 
-class TestNiveisDeRisco:
-    @pytest.mark.parametrize(
-        ("probabilidade", "esperado_nivel"),
-        [
-            (0.0, "BAIXO"),
-            (0.2999, "BAIXO"),
-            (0.30, "MODERADO"),
-            (0.6999, "MODERADO"),
-            (0.70, "CRÍTICO"),
-            (1.0, "CRÍTICO"),
-        ],
-    )
-    def test_faixas(self, probabilidade, esperado_nivel):
-        cls = classificar(probabilidade)
-        assert cls["nivel_risco"] == esperado_nivel
-        assert cls["cor_alerta"] != "#FF0000"
+
+class TestClassesDeRisco:
+    def test_tres_classes(self):
+        assert CLASSES == ("Risco Baixo", "Risco Moderado", "Risco Crítico")
+        assert NIVEIS == ("BAIXO", "MODERADO", "CRÍTICO")
+        assert CORES == ("#22C55E", "#FACC15", "#DC2626")
 
     @pytest.mark.parametrize(
-        ("prob", "nivel", "cor"),
+        ("indice", "codigo"),
         [
-            (0.0, "BAIXO", "#22C55E"),
-            (0.2999, "BAIXO", "#22C55E"),
-            (0.30, "MODERADO", "#FACC15"),
-            (0.6999, "MODERADO", "#FACC15"),
-            (0.70, "CRÍTICO", "#DC2626"),
-            (1.0, "CRÍTICO", "#DC2626"),
+            (0.0, 0),
+            (29.9, 0),
+            (30.0, 1),
+            (50.0, 1),
+            (69.9, 1),
+            (70.0, 2),
+            (100.0, 2),
         ],
     )
-    def test_classificar_parametrizado(self, prob, nivel, cor):
-        cls = classificar(prob)
-        assert cls["nivel_risco"] == nivel
-        assert cls["cor_alerta"] == cor
-        assert cls["cor_alerta"] != "#FF0000"
+    def test_codigo_do_indice(self, indice, codigo):
+        assert codigo_do_indice(indice) == codigo
+
+    def test_rotulos_por_codigo(self):
+        assert nivel_do_codigo(0) == "BAIXO"
+        assert nivel_do_codigo(1) == "MODERADO"
+        assert nivel_do_codigo(2) == "CRÍTICO"
+        assert classe_do_codigo(0) == "Risco Baixo"
+        assert classe_do_codigo(1) == "Risco Moderado"
+        assert classe_do_codigo(2) == "Risco Crítico"
+        for codigo in range(3):
+            assert cor_do_codigo(codigo) == CORES[codigo]
+            assert cor_do_codigo(codigo) != "#FF0000"
+
 
 class TestWeatherService:
     def test_estimativa_offline_respeita_faixas(self):
@@ -175,6 +171,7 @@ class TestWeatherService:
         servico.limpar_cache()
         assert servico._cache_get((1.0, 2.0)) is None
 
+
 class TestApi:
     def test_raiz(self, cliente):
         resposta = cliente.get("/")
@@ -187,6 +184,8 @@ class TestApi:
         corpo = resposta.json()
         assert corpo["status"] in {"ok", "degradado"}
         assert corpo["versao"]
+        assert corpo["banco"] in {"ok", "desconectado", "erro"}
+        assert corpo["classes"] == list(CLASSES)
 
     def test_docs_disponiveis(self, cliente):
         assert cliente.get("/docs").status_code == 200
@@ -232,10 +231,14 @@ class TestApi:
         pred = corpo["predicao"]
         assert 0.0 <= pred["probabilidade"] <= 1.0
         assert pred["porcentagem"].endswith("%")
-        assert pred["nivel_risco"] in {"BAIXO", "MODERADO", "CRÍTICO"}
-        assert pred["cor_alerta"] in {"#22C55E", "#FACC15", "#DC2626"}
+        assert pred["nivel_risco"] in set(NIVEIS)
+        assert pred["classe"] in set(CLASSES)
+        assert pred["cor_alerta"] in set(CORES)
         assert pred["cor_alerta"] != "#FF0000"
         assert pred["recomendacao"]
+        assert set(pred["probabilidades"]) == {
+            "risco_baixo", "risco_moderado", "risco_critico",
+        }
 
         dc = corpo["dados_climaticos"]
         assert -70.0 <= dc["temperatura"] <= 65.0
@@ -243,16 +246,22 @@ class TestApi:
         assert dc["precipitacao_mm"] >= 0.0
         assert dc["vento_kmh"] >= 0.0
 
-    def test_nivel_coerente_com_probabilidade(self, cliente, modelo_disponivel):
+    def test_classe_coerente_com_probabilidades(self, cliente, modelo_disponivel):
         if not modelo_disponivel:
             pytest.skip("modelo.pkl ausente")
 
-        resposta = cliente.post(
+        corpo = cliente.post(
             "/api/v1/prever-risco", json={"latitude": -23.55, "longitude": -46.63}
-        )
-        corpo = resposta.json()
-        cls = classificar(corpo["predicao"]["probabilidade"])
-        assert corpo["predicao"]["nivel_risco"] == cls["nivel_risco"]
+        ).json()
+        pred = corpo["predicao"]
+        probs = pred["probabilidades"]
+        lista = [probs["risco_baixo"], probs["risco_moderado"], probs["risco_critico"]]
+
+        mais_provavel = lista.index(max(lista))
+        assert pred["classe"] == CLASSES[mais_provavel]
+        assert pred["nivel_risco"] == NIVEIS[mais_provavel]
+        assert abs(sum(lista) - 1.0) < 0.01
+        assert abs(pred["probabilidade"] - probs["risco_critico"]) < 0.001
 
     def test_percentual_consistente(self, cliente, modelo_disponivel):
         if not modelo_disponivel:

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import math
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -28,6 +28,21 @@ CURRENT_FIELDS = (
     "wind_speed_10m",
     "wind_gusts_10m",
 )
+
+#: Campos diarios: o ultimo elemento de cada serie corresponde ao dia de hoje.
+DAILY_FIELDS = (
+    "uv_index_max",
+    "temperature_2m_max",
+    "temperature_2m_min",
+    "precipitation_sum",
+    "wind_speed_10m_max",
+)
+
+#: Quantos dias passados sao pedidos a Open-Meteo (para contar dias sem chuva).
+DIAS_PASSADOS = 60
+
+#: Chuva minima (mm) para considerar que "choveu" no dia.
+LIMIAR_CHUVA_MM = 1.0
 
 #: Limites fisicos usados para sanity check antes de devolver ao modelo.
 LIMITE_TEMPERATURA_C = (-70.0, 65.0)
@@ -80,11 +95,12 @@ class WeatherService:
             "latitude": f"{latitude:.5f}",
             "longitude": f"{longitude:.5f}",
             "current": ",".join(CURRENT_FIELDS),
-            "daily": "uv_index_max",
+            "daily": ",".join(DAILY_FIELDS),
             "wind_speed_unit": "kmh",
             "precipitation_unit": "mm",
             "timezone": "auto",
             "forecast_days": "1",
+            "past_days": str(DIAS_PASSADOS),
         }
 
     async def obter_clima(self, latitude: float, longitude: float) -> WeatherData:
@@ -104,10 +120,7 @@ class WeatherService:
             if not self.permitir_fallback:
                 raise WeatherServiceError(f"Falha ao consultar Open-Meteo: {exc}") from exc
             logger.warning("Open-Meteo indisponivel (%s). Usando estimativa local.", exc)
-            dados = self.estimar_clima(
-                latitude, longitude, hora=datetime.now(timezone.utc)
-            )
-            return dados
+            return self.estimar_clima(latitude, longitude, hora=datetime.now(UTC))
 
         self._cache_set(chave, dados)
         return dados
@@ -135,7 +148,7 @@ class WeatherService:
                     await self._sleep(0.5)
                     continue
                 break
-            except httpx.HTTPStatusError as exc:
+            except httpx.HTTPStatusError:
                 # HTTP 4xx nao tem retry
                 raise
         if last_exc is not None:
@@ -155,10 +168,12 @@ class WeatherService:
             raise WeatherServiceError("Resposta da Open-Meteo sem bloco 'current'.")
 
         diario = payload.get("daily") or {}
-        uv_max = None
-        serie_uv = diario.get("uv_index_max") or []
-        if serie_uv:
-            uv_max = _primeiro_numero(serie_uv[0])
+        uv_max = _ultimo_numero(diario.get("uv_index_max"))
+        temp_max = _ultimo_numero(diario.get("temperature_2m_max"))
+        temp_min = _ultimo_numero(diario.get("temperature_2m_min"))
+        precip_diaria = _ultimo_numero(diario.get("precipitation_sum"))
+        vento_max = _ultimo_numero(diario.get("wind_speed_10m_max"))
+        dias_sem_chuva = _dias_sem_chuva(diario.get("precipitation_sum"))
 
         dados = WeatherData(
             temperatura_c=_obrigatorio(current, "temperature_2m"),
@@ -170,6 +185,11 @@ class WeatherService:
             ponto_de_orvalho_c=_numero(current.get("dew_point_2m")),
             indice_uv=uv_max,
             cobertura_nuvens=_numero(current.get("cloud_cover")),
+            temperatura_max_c=temp_max,
+            temperatura_min_c=temp_min,
+            precipitacao_diaria_mm=precip_diaria,
+            vento_max_kmh=vento_max,
+            dias_sem_chuva=dias_sem_chuva,
             horario=_parse_hora(current.get("time")),
         )
         self._sanitizar(dados)
@@ -190,6 +210,11 @@ class WeatherService:
         dados.sensacao_termica_c = _recorta(dados.sensacao_termica_c, LIMITE_TEMPERATURA_C)
         dados.ponto_de_orvalho_c = _recorta(dados.ponto_de_orvalho_c, LIMITE_TEMPERATURA_C)
         dados.cobertura_nuvens = _recorta(dados.cobertura_nuvens, (-0.5, 101.0))
+        dados.temperatura_max_c = _recorta(dados.temperatura_max_c, LIMITE_TEMPERATURA_C)
+        dados.temperatura_min_c = _recorta(dados.temperatura_min_c, LIMITE_TEMPERATURA_C)
+        dados.precipitacao_diaria_mm = _recorta(dados.precipitacao_diaria_mm, LIMITE_PRECIPITACAO)
+        dados.vento_max_kmh = _recorta(dados.vento_max_kmh, LIMITE_VENTO_KMH)
+        dados.dias_sem_chuva = _recorta(dados.dias_sem_chuva, (0.0, 365.0))
 
     def estimar_clima(
         self,
@@ -198,7 +223,7 @@ class WeatherService:
         hora: datetime | None = None,
     ) -> WeatherData:
         if hora is None:
-            hora = datetime.now(timezone.utc)
+            hora = datetime.now(UTC)
         mes = hora.month
 
         # Media anual aproximada: ~27 C no equador caindo para ~0 C nas altas latitudes.
@@ -222,6 +247,11 @@ class WeatherService:
             ponto_de_orvalho_c=round(temperatura - (100.0 - umidade) / 5.0, 1),
             indice_uv=None,
             cobertura_nuvens=None,
+            temperatura_max_c=round(temperatura + 2.0, 1),
+            temperatura_min_c=round(temperatura - 4.0, 1),
+            precipitacao_diaria_mm=0.0,
+            vento_max_kmh=round(vento * 1.6, 1),
+            dias_sem_chuva=0.0,
             horario=hora,
         )
 
@@ -248,6 +278,26 @@ def _primeiro_numero(valor: object) -> float | None:
     if isinstance(valor, (list, tuple)):
         return _numero(valor[0]) if valor else None
     return _numero(valor)
+
+
+def _ultimo_numero(valor: object) -> float | None:
+    """Ultimo valor de uma serie diaria (o dia de hoje)."""
+    if isinstance(valor, (list, tuple)):
+        return _numero(valor[-1]) if valor else None
+    return _numero(valor)
+
+
+def _dias_sem_chuva(serie: object) -> float | None:
+    """Conta os dias consecutivos sem chuva terminando no ultimo dia da serie."""
+    if not isinstance(serie, (list, tuple)) or not serie:
+        return None
+    dias = 0
+    for valor in reversed(serie):
+        numero = _numero(valor)
+        if numero is None or numero >= LIMIAR_CHUVA_MM:
+            break
+        dias += 1
+    return float(dias)
 
 
 def _parse_hora(valor: object) -> datetime | None:

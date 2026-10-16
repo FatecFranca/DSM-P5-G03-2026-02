@@ -13,9 +13,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.config import settings
-from app.db import db
+from app.db import db, get_db_config
 from app.models.schemas import HealthResponse
 from app.routes.risk import risk_router
+from app.services.classificacao import CLASSES
 from app.services.prediction_service import ModelNotAvailableError, prediction_service
 from ml.features import FEATURES
 
@@ -26,22 +27,91 @@ logging.basicConfig(
 logger = logging.getLogger("firewatch")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Pre-aquece o modelo e o banco de dados na subida."""
-    # Inicializa pool de conexões do banco de dados
-    try:
-        await db.init()
-        logger.info("Pool de conexões DB pronto.")
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Falha ao inicializar pool DB: %s", exc)
+def _rotas_registradas(app: FastAPI) -> list[tuple[str, str, str]]:
+    """Lista (metodo, caminho, resumo) a partir do schema OpenAPI publicado.
 
-    # Pre-aquece o modelo ML
+    Usar o schema evita depender da estrutura interna de ``app.routes``, que
+    muda entre versoes do FastAPI (ex.: ``_IncludedRouter``).
+    """
+    esquema = app.openapi()
+    rotas: list[tuple[str, str, str]] = []
+    for caminho, operacoes in sorted(esquema.get("paths", {}).items()):
+        for metodo, detalhe in operacoes.items():
+            if metodo.upper() in {"HEAD", "OPTIONS"}:
+                continue
+            rotas.append((metodo.upper(), caminho, detalhe.get("summary", "")))
+    return rotas
+
+
+async def _verificar_banco() -> bool:
+    """Garante o pool de conexoes e testa uma consulta simples."""
+    cfg = get_db_config()
+    destino = f"{cfg['user']}@{cfg['host']}:{cfg['port']}/{cfg['database']}"
+    try:
+        async with db.get_connection() as conn:
+            await conn.fetchval("SELECT 1")
+    except Exception as exc:  # noqa: BLE001 - a API deve subir mesmo sem banco
+        logger.error("[FALHA] Banco de dados ....... %s (%s)", destino, exc)
+        return False
+    logger.info("[OK]    Banco de dados ....... %s", destino)
+    return True
+
+
+def _verificar_modelo() -> bool:
+    """Carrega o modelo e registra algoritmo, classes, features e acuracia."""
     try:
         prediction_service.carregar()
-        logger.info("Modelo ML pronto para uso.")
     except ModelNotAvailableError as exc:
-        logger.warning("API subiu sem modelo: %s", exc)
+        logger.error("[FALHA] Modelo ML ........... %s", exc)
+        return False
+
+    meta = prediction_service.metadados()
+    logger.info("[OK]    Modelo ML ........... %s", meta.get("algoritmo"))
+    logger.info("        classes ............. %s", ", ".join(meta.get("classes", [])))
+    logger.info("        features ............ %s", ", ".join(meta.get("features", [])))
+    if meta.get("treinado_em"):
+        logger.info("        treinado em ......... %s", meta["treinado_em"])
+    acuracia = (meta.get("metricas") or {}).get("accuracy")
+    if acuracia is not None:
+        logger.info("        acuracia (teste) .... %.4f", acuracia)
+    return True
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Verifica as dependencias, registra o estado e lista os endpoints na subida."""
+    logger.info("=" * 68)
+    logger.info("FireWatch API v%s - iniciando", __version__)
+    logger.info("=" * 68)
+
+    banco_ok = await _verificar_banco()
+    modelo_ok = _verificar_modelo()
+
+    logger.info("-" * 68)
+    logger.info(
+        "Open-Meteo ...... %s (timeout=%.0fs, cache=%.0fs, fallback=%s)",
+        settings.OPEN_METEO_URL,
+        settings.OPEN_METEO_TIMEOUT,
+        settings.CACHE_TTL_SEGUNDOS,
+        settings.PERMITIR_FALLBACK_CLIMA,
+    )
+    logger.info("CORS ............ %s", ", ".join(settings.CORS_ORIGINS))
+
+    rotas = _rotas_registradas(app)
+    logger.info("-" * 68)
+    logger.info("Endpoints disponiveis (%d):", len(rotas))
+    for metodo, caminho, resumo in rotas:
+        logger.info("  %-6s %-26s %s", metodo, caminho, resumo)
+
+    logger.info("-" * 68)
+    if banco_ok and modelo_ok:
+        logger.info("STATUS: OK - API pronta. Documentacao em http://127.0.0.1:8000/docs")
+    else:
+        pendentes = [
+            nome for nome, ok in (("banco", banco_ok), ("modelo", modelo_ok)) if not ok
+        ]
+        logger.warning("STATUS: DEGRADADO - indisponivel: %s", ", ".join(pendentes))
+    logger.info("=" * 68)
 
     yield
 
@@ -55,8 +125,9 @@ app = FastAPI(
     description=(
         "API de classificacao e predicao de risco de incendio florestal. "
         "Recebe latitude/longitude do aplicativo mobile, consulta a Open-Meteo "
-        "e aplica um modelo Random Forest para retornar probabilidade, nivel "
-        "de risco e recomendacao."
+        "e aplica um classificador Random Forest que retorna a classe de risco "
+        "(Risco Baixo / Risco Moderado / Risco Critico), as probabilidades de "
+        "cada classe e uma recomendacao."
     ),
     version=__version__,
     lifespan=lifespan,
@@ -112,6 +183,8 @@ async def health() -> HealthResponse:
         status="ok" if carregado else "degradado",
         versao=__version__,
         modelo_carregado=carregado,
+        banco=db_status,
         features=list(FEATURES),
-        acerto_estimado=metricas.get("accuracy") if carregado else None,
+        classes=list(CLASSES),
+        acerto_estimado=metricas.get("accuracy"),
     )

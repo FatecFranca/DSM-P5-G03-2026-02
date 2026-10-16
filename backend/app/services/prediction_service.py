@@ -1,10 +1,17 @@
-"""Carregamento e execucao do modelo de Machine Learning (Random Forest)."""
+"""Carregamento e execucao do modelo de Machine Learning (Random Forest).
+
+O modelo e um ``RandomForestClassifier`` treinado com dados do banco
+(``firewatch_dados``) para prever a classe de risco de fogo do dia
+(``Risco Baixo`` / ``Risco Moderado`` / ``Risco Crítico``).
+
+A API expoe as tres probabilidades por classe; o campo ``probabilidade``
+principal e a probabilidade de a classe ser ``Risco Crítico``.
+"""
 
 from __future__ import annotations
 
 import logging
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +20,14 @@ import numpy as np
 import pandas as pd
 
 from app.models.schemas import WeatherData
-from app.services.classificacao import RECOMENDACOES, classificar
+from app.services.classificacao import (
+    CLASSES,
+    RECOMENDACOES,
+    classe_do_codigo,
+    cor_do_codigo,
+    nivel_do_codigo,
+)
+from ml.alvo import N_CLASSES
 from ml.features import FEATURES, construir_features
 
 logger = logging.getLogger(__name__)
@@ -24,6 +38,28 @@ MODELO_PADRAO = Path(__file__).resolve().parents[2] / "ml" / "modelo.pkl"
 
 class ModelNotAvailableError(RuntimeError):
     """O artefato modelo.pkl nao existe ou nao pode ser desserializado."""
+
+
+def _bruto_de_clima(clima: WeatherData) -> dict[str, Any]:
+    """Mapeia o clima de producao para as features fisicas do modelo."""
+    temp_max = clima.temperatura_max_c if clima.temperatura_max_c is not None else clima.temperatura_c
+    temp_min = clima.temperatura_min_c if clima.temperatura_min_c is not None else clima.temperatura_c
+    precipitacao = (
+        clima.precipitacao_diaria_mm
+        if clima.precipitacao_diaria_mm is not None
+        else clima.precipitacao_mm
+    )
+    vento = clima.vento_max_kmh if clima.vento_max_kmh is not None else clima.velocidade_vento_kmh
+    dias_sem_chuva = clima.dias_sem_chuva if clima.dias_sem_chuva is not None else 0.0
+
+    return {
+        "temp_max": temp_max,
+        "temp_min": temp_min,
+        "umidade": clima.umidade_relativa,
+        "precipitacao_mm": precipitacao,
+        "velocidade_vento": vento,
+        "dias_sem_chuva": dias_sem_chuva,
+    }
 
 
 class PredictionService:
@@ -70,6 +106,14 @@ class PredictionService:
                     "Retreine com: python ml/treinamento.py"
                 )
 
+            classes_do_modelo = tuple(bundle.get("classes") or CLASSES)
+            if classes_do_modelo != CLASSES:
+                raise ModelNotAvailableError(
+                    "Incompatibilidade das classes: "
+                    f"modelo treinado com {classes_do_modelo}, codigo espera {CLASSES}. "
+                    "Retreine com: python ml/treinamento.py"
+                )
+
             self._bundle = bundle
             logger.info("Modelo carregado de %s", self.caminho)
             return self._bundle
@@ -84,45 +128,39 @@ class PredictionService:
         return {
             "arquivo": self.caminho.name,
             "algoritmo": bundle.get("algoritmo", "RandomForestClassifier"),
+            "alvo": bundle.get("alvo", "classe_risco"),
+            "classes": list(bundle.get("classes") or CLASSES),
             "features": list(bundle.get("features") or FEATURES),
             "treinado_em": bundle.get("treinado_em"),
             "dataset": bundle.get("dataset"),
             "metricas": bundle.get("metricas", {}),
-            "limiares": bundle.get("limiares", {}),
             "importancias": bundle.get("importancias", {}),
         }
 
     # ---------------------------------------------------------------- predicao
 
-    def prever_probabilidade(self, clima: WeatherData) -> float:
-        """Retorna a probabilidade de incendio (0.0 - 1.0) para um clima."""
+    def prever_probabilidades(self, clima: WeatherData) -> np.ndarray:
+        """Probabilidade de cada classe, na ordem dos codigos 0/1/2."""
         bundle = self.carregar()
         modelo = bundle["modelo"]
 
-        bruto = {
-            "temperature_2m": clima.temperatura_c,
-            "relative_humidity_2m": clima.umidade_relativa,
-            "precipitation": clima.precipitacao_mm,
-            "wind_speed_10m": clima.velocidade_vento_kmh,
-            "apparent_temperature": clima.sensacao_termica_c,
-            "dew_point_2m": clima.ponto_de_orvalho_c,
-            "wind_gusts_10m": clima.rajada_vento_kmh,
-            "uv_index_max": clima.indice_uv,
-            "cloud_cover": clima.cobertura_nuvens,
-        }
-
-        features = construir_features(bruto)
+        features = construir_features(_bruto_de_clima(clima))
         matriz = pd.DataFrame([[features[nome] for nome in FEATURES]], columns=list(FEATURES))
 
         try:
-            if hasattr(modelo, "predict_proba"):
-                probabilidades = modelo.predict_proba(matriz)
-                classes = list(modelo.classes_)
-                coluna = classes.index(1) if 1 in classes else -1
-                return float(np.clip(probabilidades[0][coluna], 0.0, 1.0))
-            return float(np.clip(modelo.predict(matriz)[0], 0.0, 1.0))
+            proba = np.asarray(modelo.predict_proba(matriz)).ravel()
         except Exception as exc:  # noqa: BLE001
             raise ModelNotAvailableError(f"Erro na predicao: {exc}") from exc
+
+        classes = list(getattr(modelo, "classes_", range(len(proba))))
+        ordenado = np.zeros(N_CLASSES, dtype=float)
+        for codigo, valor in zip(classes, proba, strict=True):
+            ordenado[int(codigo)] = float(valor)
+        return ordenado
+
+    def prever_classe(self, clima: WeatherData) -> int:
+        """Codigo da classe mais provavel (0=Baixo, 1=Moderado, 2=Critico)."""
+        return int(np.argmax(self.prever_probabilidades(clima)))
 
     def prever(
         self,
@@ -132,12 +170,15 @@ class PredictionService:
         local: str | None = None,
     ) -> dict[str, Any]:
         """Executa a predicao completa e monta o dicionario de resposta."""
-        probabilidade = round(float(self.prever_probabilidade(clima)), 3)
-        probabilidade = max(0.0, min(1.0, probabilidade))
-        cls = classificar(probabilidade)
-        nivel_risco = cls["nivel_risco"]
-        cor_alerta = cls["cor_alerta"]
+        proba = self.prever_probabilidades(clima)
+        codigo = int(np.argmax(proba))
+        nivel_risco = nivel_do_codigo(codigo)
+        classe = classe_do_codigo(codigo)
+        cor_alerta = cor_do_codigo(codigo)
         recomendacao = RECOMENDACOES[nivel_risco]
+
+        # Campo principal: probabilidade de a classe ser Risco Critico.
+        probabilidade = round(float(np.clip(proba[2], 0.0, 1.0)), 4)
         porcentagem = f"{probabilidade * 100.0:.1f}%"
 
         return {
@@ -156,8 +197,14 @@ class PredictionService:
                 "probabilidade": probabilidade,
                 "porcentagem": porcentagem,
                 "nivel_risco": nivel_risco,
+                "classe": classe,
                 "cor_alerta": cor_alerta,
                 "recomendacao": recomendacao,
+                "probabilidades": {
+                    "risco_baixo": round(float(proba[0]), 4),
+                    "risco_moderado": round(float(proba[1]), 4),
+                    "risco_critico": round(float(proba[2]), 4),
+                },
             },
         }
 

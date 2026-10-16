@@ -16,13 +16,14 @@ env/
 ENV/
 venv.bak/
 env.bak/
+.venv/
 
-# ML models and datasets
+# ML models and datasets (artefatos gerados)
 *.pkl
 *.h5
 *.hdf5
-*model*
-*checkpoint*
+*.joblib
+*.model
 
 # IDE / Editor
 .vscode/
@@ -36,6 +37,7 @@ env.bak/
 
 # Testing
 .pytest_cache/
+.ruff_cache/
 htmlcov/
 .coverage
 

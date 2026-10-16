@@ -139,7 +139,7 @@ def test_cache_funciona_e_vai_pra_rede_apos_ttl(monkeypatch, cliente):
     res2 = cliente.post("/api/v1/prever-risco", json={"latitude": -12.0, "longitude": -44.0})
     assert res2.status_code == 200
     assert calls["n"] == 1
-    ws_module.weather_service.cache_ttl = 0
+    monkeypatch.setattr(ws_module.weather_service, "cache_ttl", 0)
     res3 = cliente.post("/api/v1/prever-risco", json={"latitude": -12.0, "longitude": -44.0})
     assert res3.status_code == 200
     assert calls["n"] == 2

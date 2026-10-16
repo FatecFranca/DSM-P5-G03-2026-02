@@ -6,7 +6,6 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.config import settings
 from app.db import db
 from app.models.schemas import LocationRequest, RiskResponse
 from app.services.prediction_service import (
@@ -71,10 +70,12 @@ async def prever_risco(localizacao: LocationRequest) -> RiskResponse:
 async def db_test(conn=Depends(get_db)):
     """Testa a conexão com o banco de dados."""
     try:
-        result = await conn.fetchval("SELECT current_user, current_database()")
-        return {"status": "ok", "usuario": str(result[0]), "banco": str(result[1])}
-    except Exception as exc:  # noqa: BLE001
+        result = await conn.fetchrow(
+            "SELECT current_user AS usuario, current_database() AS banco"
+        )
+        return {"status": "ok", "usuario": str(result["usuario"]), "banco": str(result["banco"])}
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao conectar com o banco de dados: {exc}",
-        )
+        ) from exc

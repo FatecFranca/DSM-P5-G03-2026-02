@@ -1,9 +1,23 @@
 """Engenharia de features do FireWatch.
 
-Este modulo e o unico lugar onde as features sao definidas. O treinamento
+Este e o unico lugar onde as features sao definidas. O treinamento
 (`ml/treinamento.py`) e a inferencia em producao
 (`app/services/prediction_service.py`) importam daqui, garantindo que o modelo
 receba exatamente as mesmas colunas, na mesma ordem, com a mesma formula.
+
+Semantica do dataset de risco de incendio (tabela `firewatch_dados`):
+
+- As cinco variaveis climaticas (``temp_max``, ``temp_min``, ``umidade``,
+  ``precipitacao_mm``, ``velocidade_vento``) sao medias climatologicas por
+  municipio, em unidades fisicas (graus Celsius, %, mm e km/h).
+- ``dias_sem_chuva`` e o numero de dias consecutivos sem chuva (dinamico).
+  No dataset ele foi disponibilizado ja padronizado (z-score); a escala
+  bruta usada para converter o valor calculado em producao esta em
+  :data:`ESCALA_DIAS_SEM_CHUVA`.
+
+No banco as colunas climaticas aparecem com o prefixo ``avg_`` e em z-score;
+:data:`DESPADRONIZACAO` guarda as medias/desvios que revertem essa
+padronizacao para as unidades fisicas originais.
 """
 
 from __future__ import annotations
@@ -14,75 +28,64 @@ from typing import Any
 
 #: Ordem canonica das features. Nao reordenar sem retreinar o modelo.
 FEATURES: tuple[str, ...] = (
-    "temperature_2m",
-    "relative_humidity_2m",
-    "precipitation",
-    "wind_speed_10m",
-    "apparent_temperature",
-    "dew_point_2m",
-    "wind_gusts_10m",
-    "uv_index_max",
-    "cloud_cover",
-    "vpd_kpa",
-    "aridity_index",
+    "temp_max",
+    "temp_min",
+    "umidade",
+    "precipitacao_mm",
+    "velocidade_vento",
+    "dias_sem_chuva",
 )
 
-#: Features obrigatorias (as quatro variaveis centrais do projeto).
-FEATURES_CENTRAIS: tuple[str, ...] = FEATURES[:4]
-
-#: Valor usado quando a Open-Meteo nao devolve um campo opcional.
-#: Coerente com as medianas observadas no dataset FireWatch 2024.
-VALOR_POR_OMISSAO: dict[str, float] = {
-    "apparent_temperature": 22.0,
-    "dew_point_2m": 12.0,
-    "wind_gusts_10m": 22.0,
-    "uv_index_max": 6.0,
-    "cloud_cover": 40.0,
+#: (media, desvio) de cada coluna climatica, usados para DESPADRONIZAR as
+#: colunas ``avg_*`` do banco (que estao em z-score) de volta para unidades
+#: fisicas. Valores calculados sobre o dataset FireWatch 2024 (2024-01-01 a
+#: 2024-09-30, 177.779 registros).
+DESPADRONIZACAO: dict[str, tuple[float, float]] = {
+    "temp_max": (29.351207751048904, 2.8806145456908023),
+    "temp_min": (20.673921365422, 3.509741905308333),
+    "umidade": (71.91912512718264, 9.0274019718513),
+    "precipitacao_mm": (3.829831744268072, 1.7716769719344598),
+    "velocidade_vento": (16.38251736973688, 2.7418845978464566),
 }
 
-#: Faixas plausiveis. Valores fora sao recortados (clip) para evitar que um
-#: outlier da API exploda a predicao.
+#: (media, desvio) para converter o numero de dias sem chuva (unidades brutas)
+#: na escala z-score em que o modelo foi treinado. A escala bruta do dataset
+#: nao foi preservada: foi recuperada mapeando a faixa observada de z-score
+#: (-0.7398 .. 3.1731) para o intervalo fisico 0 .. 60 dias sem chuva.
+ESCALA_DIAS_SEM_CHUVA: tuple[float, float] = (11.344, 15.334)
+
+#: Limites fisicos plausiveis. Valores fora sao recortados (clip) para evitar
+#: que um outlier da Open-Meteo exploda a predicao.
 LIMITES: dict[str, tuple[float, float]] = {
-    "temperature_2m": (-50.0, 60.0),
-    "relative_humidity_2m": (1.0, 100.0),
-    "precipitation": (0.0, 300.0),
-    "wind_speed_10m": (0.0, 200.0),
-    "apparent_temperature": (-60.0, 65.0),
-    "dew_point_2m": (-60.0, 40.0),
-    "wind_gusts_10m": (0.0, 250.0),
-    "uv_index_max": (0.0, 16.0),
-    "cloud_cover": (0.0, 100.0),
+    "temp_max": (-20.0, 60.0),
+    "temp_min": (-30.0, 45.0),
+    "umidade": (1.0, 100.0),
+    "precipitacao_mm": (0.0, 300.0),
+    "velocidade_vento": (0.0, 200.0),
+    "dias_sem_chuva": (0.0, 180.0),
+}
+
+#: Valores usados quando a fonte nao devolve um campo (mediana do dataset).
+VALOR_POR_OMISSAO: dict[str, float] = {
+    "temp_max": 29.0,
+    "temp_min": 21.0,
+    "umidade": 72.0,
+    "precipitacao_mm": 3.8,
+    "velocidade_vento": 16.4,
+    "dias_sem_chuva": 8.0,
 }
 
 
-def pressao_saturacao_vapor(temperatura_c: float) -> float:
-    """Pressao de vapor saturado (kPa) pela equacao de Magnus.
-
-    Tetens/Magnus: es = 0.6108 * exp(17.27 * T / (T + 237.3))
-    """
-    return 0.6108 * math.exp(17.27 * temperatura_c / (temperatura_c + 237.3))
+def despadronizar(coluna: str, z: float) -> float:
+    """Reverte o z-score de uma coluna climatica para unidades fisicas."""
+    media, desvio = DESPADRONIZACAO[coluna]
+    return z * desvio + media
 
 
-def deficit_pressao_vapor(temperatura_c: float, umidade_relativa: float) -> float:
-    """VPD em kPa: quao seco esta o ar para a vegetacao (principal driver de fogo)."""
-    es = pressao_saturacao_vapor(temperatura_c)
-    ea = es * (umidade_relativa / 100.0)
-    return max(0.0, es - ea)
-
-
-def indice_aridez(vpd: float, vento_kmh: float, precipitacao: float) -> float:
-    """Indice composto de aridez usado pelo modelo.
-
-    Combina deficit de umidade do ar, energia do vento e ausencia de chuva.
-    Escala 0 (dia chuvoso e umido) a ~100 (seco, ventoso e sem chuva).
-    """
-    componente_umidade = min(100.0, vpd * 12.0)
-    componente_vento = min(100.0, vento_kmh * 2.5)
-    componente_chuva = max(0.0, 100.0 - precipitacao * 60.0)
-    return round(
-        0.50 * componente_umidade + 0.30 * componente_vento + 0.20 * componente_chuva,
-        4,
-    )
+def padronizar_dias_sem_chuva(dias: float) -> float:
+    """Converte dias sem chuva (bruto) para a escala z-score do modelo."""
+    media, desvio = ESCALA_DIAS_SEM_CHUVA
+    return (dias - media) / desvio
 
 
 def _valor(bruto: Mapping[str, Any], chave: str) -> float:
@@ -109,26 +112,20 @@ def _valor(bruto: Mapping[str, Any], chave: str) -> float:
 
 
 def construir_features(bruto: Mapping[str, Any]) -> dict[str, float]:
-    """Converte um dicionario de clima em um vetor de features do modelo."""
-    temperatura = _valor(bruto, "temperature_2m")
-    umidade = _valor(bruto, "relative_humidity_2m")
-    precipitacao = _valor(bruto, "precipitation")
-    vento = _valor(bruto, "wind_speed_10m")
+    """Converte um dicionario de clima em um vetor de features do modelo.
 
-    vpd = deficit_pressao_vapor(temperatura, umidade)
-
+    ``bruto`` deve trazer as variaveis em unidades fisicas:
+    ``temp_max``, ``temp_min``, ``umidade``, ``precipitacao_mm``,
+    ``velocidade_vento`` e ``dias_sem_chuva`` (dias consecutivos sem chuva).
+    """
+    dias_bruto = _valor(bruto, "dias_sem_chuva")
     return {
-        "temperature_2m": temperatura,
-        "relative_humidity_2m": umidade,
-        "precipitation": precipitacao,
-        "wind_speed_10m": vento,
-        "apparent_temperature": _valor(bruto, "apparent_temperature"),
-        "dew_point_2m": _valor(bruto, "dew_point_2m"),
-        "wind_gusts_10m": _valor(bruto, "wind_gusts_10m"),
-        "uv_index_max": _valor(bruto, "uv_index_max"),
-        "cloud_cover": _valor(bruto, "cloud_cover"),
-        "vpd_kpa": round(vpd, 4),
-        "aridity_index": indice_aridez(vpd, vento, precipitacao),
+        "temp_max": round(_valor(bruto, "temp_max"), 4),
+        "temp_min": round(_valor(bruto, "temp_min"), 4),
+        "umidade": round(_valor(bruto, "umidade"), 4),
+        "precipitacao_mm": round(_valor(bruto, "precipitacao_mm"), 4),
+        "velocidade_vento": round(_valor(bruto, "velocidade_vento"), 4),
+        "dias_sem_chuva": round(padronizar_dias_sem_chuva(dias_bruto), 4),
     }
 
 

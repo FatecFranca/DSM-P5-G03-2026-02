@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any
+from datetime import datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """Niveis de risco de incendio florestal."""
 
     BAIXO = "BAIXO"
@@ -68,6 +67,22 @@ class WeatherData(BaseModel):
     cobertura_nuvens: float | None = Field(
         default=None, ge=0.0, le=100.0, description="Cobertura de nuvens em porcentagem."
     )
+    # Campos diarios usados pelas features do modelo (unidades fisicas).
+    temperatura_max_c: float | None = Field(
+        default=None, description="Temperatura maxima do dia, em graus Celsius."
+    )
+    temperatura_min_c: float | None = Field(
+        default=None, description="Temperatura minima do dia, em graus Celsius."
+    )
+    precipitacao_diaria_mm: float | None = Field(
+        default=None, ge=0.0, description="Precipitacao acumulada do dia, em mm."
+    )
+    vento_max_kmh: float | None = Field(
+        default=None, ge=0.0, description="Velocidade maxima do vento no dia, em km/h."
+    )
+    dias_sem_chuva: float | None = Field(
+        default=None, ge=0.0, description="Dias consecutivos sem chuva."
+    )
     horario: datetime | None = Field(
         default=None, description="Horario de referencia da observacao (UTC)."
     )
@@ -85,12 +100,27 @@ class DadosClimaticosResponse(BaseModel):
     vento_kmh: float
 
 
+class ProbabilidadesResponse(BaseModel):
+    """Probabilidade prevista de cada classe de risco (0.0 a 1.0)."""
+
+    risco_baixo: float = Field(..., ge=0.0, le=1.0)
+    risco_moderado: float = Field(..., ge=0.0, le=1.0)
+    risco_critico: float = Field(..., ge=0.0, le=1.0)
+
+
 class PredicaoResponse(BaseModel):
-    probabilidade: float = Field(..., ge=0.0, le=1.0)
+    probabilidade: float = Field(
+        ..., ge=0.0, le=1.0, description="Probabilidade da classe Risco Crítico."
+    )
     porcentagem: str
-    nivel_risco: str
+    nivel_risco: str = Field(..., description="BAIXO, MODERADO ou CRÍTICO.")
+    classe: str = Field(
+        ...,
+        description="Risco Baixo, Risco Moderado ou Risco Crítico.",
+    )
     cor_alerta: str
     recomendacao: str
+    probabilidades: ProbabilidadesResponse | None = None
 
 
 class RiskResponse(BaseModel):
@@ -106,5 +136,9 @@ class HealthResponse(BaseModel):
     status: str
     versao: str
     modelo_carregado: bool
+    banco: str | None = Field(
+        default=None, description="Estado da conexao com o banco de dados."
+    )
     features: list[str] | None = None
+    classes: list[str] | None = None
     acerto_estimado: float | None = None
