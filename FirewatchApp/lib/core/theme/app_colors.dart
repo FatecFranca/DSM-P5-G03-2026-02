@@ -21,6 +21,11 @@ abstract final class AppColors {
   static const Color grayLight = Color(0xFFA8A29E);
   static const Color border = Color(0xFFE7E0D6);
 
+  // Painel de monitoramento (superfícies claras com detalhes laranja)
+  static const Color panelBackground = Color(0xFFFFFFFF);
+  static const Color metricCard = Color(0xFFF4EFE8);
+  static const Color metricCardBorder = Color(0xFFEBE4DA);
+
   // Níveis de risco
   static const Color riskLow = Color(0xFF22C55E);
   static const Color riskModerate = Color(0xFFFACC15);

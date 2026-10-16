@@ -15,6 +15,10 @@ abstract final class AppConstants {
   static const String splashStartLabel = 'Começar';
   static const String splashProjectLabel = 'PROJETO INTEGRADOR • 5º SEMESTRE';
 
+  // Monitoramento
+  static const String conditionsNowLabel = 'CONDIÇÕES AGORA';
+  static const String verifyRiskLabel = 'Verificar risco aqui';
+
   /// Sinaliza dados demonstrativos até a integração com backend.
   static const String demoDisclaimer = 'Dados demonstrativos';
 

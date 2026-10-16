@@ -5,6 +5,7 @@ import '../../features/alerts/alerts_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/forecast/forecast_screen.dart';
 import '../../features/map/map_screen.dart';
+import '../../features/monitoring/monitoring_screen.dart';
 import '../../features/onboarding/coordinates_screen.dart';
 import '../../features/onboarding/location_onboarding_screen.dart';
 import '../../features/prevention/prevention_screen.dart';
@@ -38,6 +39,13 @@ abstract final class AppRouter {
           parentNavigatorKey: _rootNavigatorKey,
           path: '/onboarding/coordinates',
           builder: (context, state) => const CoordinatesScreen(),
+        ),
+
+        // Mapa de monitoramento com as coordenadas informadas.
+        GoRoute(
+          parentNavigatorKey: _rootNavigatorKey,
+          path: '/monitoring',
+          builder: (context, state) => const MonitoringScreen(),
         ),
 
         // Navegação inferior com estado preservado por aba.

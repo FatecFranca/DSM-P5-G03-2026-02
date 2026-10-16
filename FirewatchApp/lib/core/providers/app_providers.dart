@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/api_service.dart';
+import '../../services/geocoding_service.dart';
 import '../../services/location_service.dart';
 import '../data/demo_data.dart';
 import '../models/geo_coordinates.dart';
@@ -19,6 +21,20 @@ final locationServiceProvider =
 
 /// Coordenadas obtidas via GPS ou digitadas manualmente no onboarding.
 final coordinatesProvider = StateProvider<GeoCoordinates?>((ref) => null);
+
+/// Cliente da API de risco/clima do FireWatch.
+final apiServiceProvider = Provider<ApiService>((ref) {
+  final service = ApiService();
+  ref.onDispose(service.close);
+  return service;
+});
+
+/// Serviço de geocodificação reversa (coordenadas -> cidade/estado).
+final geocodingServiceProvider = Provider<GeocodingService>((ref) {
+  final service = GeocodingService();
+  ref.onDispose(service.close);
+  return service;
+});
 
 /// Filtro de severidade na tela de alertas (null = todos).
 final alertSeverityFilterProvider =
