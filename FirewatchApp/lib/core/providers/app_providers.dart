@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/location_service.dart';
 import '../data/demo_data.dart';
+import '../models/geo_coordinates.dart';
 import '../models/risk_alert.dart';
 import '../models/risk_level.dart';
 
@@ -10,6 +12,13 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 
 /// Localização selecionada na configuração.
 final locationProvider = StateProvider<String>((ref) => 'Franca, SP');
+
+/// Serviço de localização do dispositivo (permissão + GPS).
+final locationServiceProvider =
+    Provider<LocationService>((ref) => const LocationService());
+
+/// Coordenadas obtidas via GPS ou digitadas manualmente no onboarding.
+final coordinatesProvider = StateProvider<GeoCoordinates?>((ref) => null);
 
 /// Filtro de severidade na tela de alertas (null = todos).
 final alertSeverityFilterProvider =

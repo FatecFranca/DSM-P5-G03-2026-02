@@ -5,6 +5,8 @@ import '../../features/alerts/alerts_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/forecast/forecast_screen.dart';
 import '../../features/map/map_screen.dart';
+import '../../features/onboarding/coordinates_screen.dart';
+import '../../features/onboarding/location_onboarding_screen.dart';
 import '../../features/prevention/prevention_screen.dart';
 import '../../features/risk_details/risk_details_screen.dart';
 import '../../features/settings/settings_screen.dart';
@@ -24,6 +26,18 @@ abstract final class AppRouter {
         GoRoute(
           path: '/splash',
           builder: (context, state) => const SplashScreen(),
+        ),
+
+        // Onboarding de localização.
+        GoRoute(
+          parentNavigatorKey: _rootNavigatorKey,
+          path: '/onboarding/location',
+          builder: (context, state) => const LocationOnboardingScreen(),
+        ),
+        GoRoute(
+          parentNavigatorKey: _rootNavigatorKey,
+          path: '/onboarding/coordinates',
+          builder: (context, state) => const CoordinatesScreen(),
         ),
 
         // Navegação inferior com estado preservado por aba.
