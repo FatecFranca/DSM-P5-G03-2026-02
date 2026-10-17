@@ -15,6 +15,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../features/shell/app_shell.dart';
+import '../../services/api_service.dart';
 
 /// Fonte dos tiles do mapa. Substituível em testes para evitar rede.
 final mapTileProviderProvider = Provider<TileProvider>(
@@ -55,7 +56,13 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
     super.initState();
     _coordinates = ref.read(coordinatesProvider);
     if (_coordinates != null) {
-      _loadConditions();
+      final cached = ref.read(riskPredictionProvider);
+      if (cached != null && _matchesCoordinates(cached, _coordinates!)) {
+        _prediction = cached;
+        _lastUpdated = DateTime.now();
+      } else {
+        _loadConditions();
+      }
       _resolveLocationName();
     }
     _clock = Timer.periodic(
@@ -74,6 +81,29 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
   LatLng get _center =>
       LatLng(_coordinates!.latitude, _coordinates!.longitude);
 
+  /// Verifica se uma previsão corresponde às coordenadas atuais.
+  bool _matchesCoordinates(RiskPrediction prediction, GeoCoordinates coordinates) {
+    const tolerance = 0.0001;
+    return (prediction.latitude - coordinates.latitude).abs() < tolerance &&
+        (prediction.longitude - coordinates.longitude).abs() < tolerance;
+  }
+
+  /// Mensagem amigável para falhas de consulta à API.
+  String _errorMessage(Object error) {
+    if (error is ApiException) {
+      return switch (error.statusCode) {
+        422 => 'As coordenadas informadas são inválidas.',
+        503 =>
+          'Serviço de previsão indisponível no momento. Tente novamente mais tarde.',
+        _ => error.message,
+      };
+    }
+    if (error is FormatException) {
+      return 'Resposta inesperada do serviço. Tente novamente.';
+    }
+    return 'Não foi possível consultar o risco agora. Tente novamente.';
+  }
+
   Future<void> _loadConditions() async {
     final coordinates = _coordinates;
     if (coordinates == null) return;
@@ -87,16 +117,16 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
           .preverRisco(coordinates.latitude, coordinates.longitude);
       final prediction = RiskPrediction.fromJson(json);
       if (!mounted) return;
+      ref.read(riskPredictionProvider.notifier).state = prediction;
       setState(() {
         _prediction = prediction;
         _lastUpdated = DateTime.now();
         _loadingConditions = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _conditionsError =
-            'Condições indisponíveis no momento. Verifique sua conexão.';
+        _conditionsError = _errorMessage(error);
         _loadingConditions = false;
       });
     }
@@ -129,6 +159,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
           .preverRisco(coordinates.latitude, coordinates.longitude);
       final prediction = RiskPrediction.fromJson(json);
       if (!mounted) return;
+      ref.read(riskPredictionProvider.notifier).state = prediction;
       setState(() {
         _prediction = prediction;
         _conditionsError = null;
@@ -136,17 +167,13 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
         _verifying = false;
       });
       _showRiskResult(prediction);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() => _verifying = false);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Não foi possível consultar o risco agora. Tente novamente.',
-            ),
-          ),
+          SnackBar(content: Text(_errorMessage(error))),
         );
     }
   }

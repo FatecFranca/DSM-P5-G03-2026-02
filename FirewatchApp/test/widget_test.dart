@@ -199,4 +199,45 @@ void main() {
     // Descarta eventuais erros de imagem dos tiles de rede.
     tester.takeException();
   });
+
+  testWidgets('mostra erro e permanece no formulário quando a consulta falha',
+      (tester) async {
+    final overrides = <Override>[
+      apiServiceProvider.overrideWithValue(
+        ApiService(
+          client: MockClient(
+            (_) async => http.Response(
+              '{"detail":"Serviço de previsão indisponível"}',
+              503,
+              headers: {'content-type': 'application/json'},
+            ),
+          ),
+          baseUrl: 'https://api.example.test',
+        ),
+      ),
+      geocodingServiceProvider.overrideWithValue(
+        GeocodingService(client: _geocodingMockClient()),
+      ),
+      mapTileProviderProvider.overrideWithValue(_FakeTileProvider()),
+    ];
+    await _pumpApp(tester, overrides: overrides);
+
+    await tester.tap(find.text('Começar'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Digitar coordenadas'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Digitar coordenadas'));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), '-20.5386');
+    await tester.enterText(fields.at(1), '-47.4008');
+    await tester.tap(find.text('Confirmar coordenadas'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Mensagem de erro exibida e sem navegação para o monitoramento.
+    expect(find.text('Serviço de previsão indisponível'), findsOneWidget);
+    expect(find.text('CONDIÇÕES AGORA'), findsNothing);
+  });
 }

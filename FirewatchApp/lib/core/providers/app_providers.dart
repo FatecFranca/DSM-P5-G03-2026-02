@@ -8,6 +8,7 @@ import '../data/demo_data.dart';
 import '../models/geo_coordinates.dart';
 import '../models/risk_alert.dart';
 import '../models/risk_level.dart';
+import '../models/risk_prediction.dart';
 
 /// Modo de tema selecionado (claro/escuro). Controlado pela tela de configurações.
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
@@ -21,6 +22,12 @@ final locationServiceProvider =
 
 /// Coordenadas obtidas via GPS ou digitadas manualmente no onboarding.
 final coordinatesProvider = StateProvider<GeoCoordinates?>((ref) => null);
+
+/// Último resultado real de previsão de risco retornado pela API.
+///
+/// Compartilhado entre o formulário de coordenadas e a tela de monitoramento
+/// para evitar consultas duplicadas.
+final riskPredictionProvider = StateProvider<RiskPrediction?>((ref) => null);
 
 /// Cliente da API de risco/clima do FireWatch.
 final apiServiceProvider = Provider<ApiService>((ref) {

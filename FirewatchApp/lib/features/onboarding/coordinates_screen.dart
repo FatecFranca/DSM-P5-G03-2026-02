@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/models/geo_coordinates.dart';
+import '../../core/models/risk_prediction.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../services/api_service.dart';
 
 /// Formulário para informar latitude e longitude manualmente.
 class CoordinatesScreen extends ConsumerStatefulWidget {
@@ -21,6 +23,8 @@ class _CoordinatesScreenState extends ConsumerState<CoordinatesScreen> {
   final _formKey = GlobalKey<FormState>();
   final _latitudeController = TextEditingController();
   final _longitudeController = TextEditingController();
+
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -50,15 +54,44 @@ class _CoordinatesScreenState extends ConsumerState<CoordinatesScreen> {
     return null;
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_submitting) return;
     if (!_formKey.currentState!.validate()) return;
 
     final coordinates = GeoCoordinates(
       latitude: _parse(_latitudeController.text)!,
       longitude: _parse(_longitudeController.text)!,
     );
-    ref.read(coordinatesProvider.notifier).state = coordinates;
-    context.go('/monitoring');
+
+    setState(() => _submitting = true);
+    try {
+      final json = await ref
+          .read(apiServiceProvider)
+          .preverRisco(coordinates.latitude, coordinates.longitude);
+      final prediction = RiskPrediction.fromJson(json);
+      if (!mounted) return;
+
+      ref.read(coordinatesProvider.notifier).state = coordinates;
+      ref.read(riskPredictionProvider.notifier).state = prediction;
+      context.go('/monitoring');
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showMessage(error.message);
+    } on FormatException {
+      if (!mounted) return;
+      _showMessage('Resposta inesperada do serviço. Tente novamente.');
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Não foi possível consultar o risco agora. Tente novamente.');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -107,8 +140,17 @@ class _CoordinatesScreenState extends ConsumerState<CoordinatesScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xxl),
                 FilledButton(
-                  onPressed: _submit,
-                  child: const Text('Confirmar coordenadas'),
+                  onPressed: _submitting ? null : _submit,
+                  child: _submitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: AppColors.white,
+                          ),
+                        )
+                      : const Text('Confirmar coordenadas'),
                 ),
               ],
             ),
