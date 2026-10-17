@@ -14,7 +14,6 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
-import '../../features/shell/app_shell.dart';
 import '../../services/api_service.dart';
 
 /// Fonte dos tiles do mapa. Substituível em testes para evitar rede.
@@ -264,38 +263,6 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
             verifying: _verifying,
             onVerify: _verifyRisk,
           ),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        onDestinationSelected: (index) {
-          final dest = ShellDestination.values[index];
-          switch (dest) {
-            case ShellDestination.home:
-              context.go('/');
-              break;
-            case ShellDestination.forecast:
-              context.go('/forecast');
-              break;
-            case ShellDestination.map:
-              context.go('/map');
-              break;
-            case ShellDestination.alerts:
-              context.go('/alerts');
-              break;
-            case ShellDestination.prevention:
-              context.go('/prevention');
-              break;
-          }
-        },
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          for (final d in ShellDestination.values)
-            NavigationDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.activeIcon),
-              label: d.label,
-            ),
         ],
       ),
     );

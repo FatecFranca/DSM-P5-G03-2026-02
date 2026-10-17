@@ -137,8 +137,7 @@ void main() {
     await tester.tap(find.text('Pular'));
     await tester.pumpAndSettle();
 
-    // Dashboard renderizado.
-    expect(find.text('Risco de queimada'), findsOneWidget);
+    expect(find.text('Nenhuma coordenada informada.'), findsOneWidget);
     expect(find.text('Início'), findsOneWidget);
     expect(find.text('Alertas'), findsWidgets);
   });

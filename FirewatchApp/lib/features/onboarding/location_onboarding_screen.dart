@@ -33,7 +33,7 @@ class _LocationOnboardingScreenState
           .getCurrentLocation();
       ref.read(coordinatesProvider.notifier).state = coordinates;
       if (!mounted) return;
-      context.go('/monitoring');
+      context.go('/');
     } on LocationException catch (error) {
       if (!mounted) return;
       _showMessage(error.message);

@@ -73,7 +73,7 @@ class _CoordinatesScreenState extends ConsumerState<CoordinatesScreen> {
 
       ref.read(coordinatesProvider.notifier).state = coordinates;
       ref.read(riskPredictionProvider.notifier).state = prediction;
-      context.go('/monitoring');
+      context.go('/');
     } on ApiException catch (error) {
       if (!mounted) return;
       _showMessage(error.message);
