@@ -19,8 +19,8 @@ abstract final class AppTheme {
     return ColorScheme(
       brightness: brightness,
       primary: AppColors.orange,
-      onPrimary: AppColors.white,
-      secondary: AppColors.orangeDark,
+      onPrimary: AppColors.charcoal,
+      secondary: AppColors.orangeText,
       onSecondary: AppColors.white,
       error: AppColors.riskCritical,
       onError: AppColors.white,
@@ -29,7 +29,9 @@ abstract final class AppTheme {
       onSurfaceVariant: isDark ? AppColors.grayLight : AppColors.grayDark,
       outline: isDark ? AppColors.darkBorder : AppColors.border,
       outlineVariant: isDark ? AppColors.darkBorder : AppColors.border,
-      surfaceContainerHighest: isDark ? AppColors.darkSurfaceHigh : AppColors.border,
+      surfaceContainerHighest: isDark
+          ? AppColors.darkSurfaceHigh
+          : AppColors.border,
       inverseSurface: isDark ? AppColors.background : AppColors.charcoal,
       onInverseSurface: isDark ? AppColors.charcoal : AppColors.white,
       inversePrimary: AppColors.amber,
@@ -96,14 +98,18 @@ abstract final class AppTheme {
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: scheme.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xl),
+          ),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.charcoal,
         contentTextStyle: AppTypography.inter(AppColors.white, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -129,7 +135,8 @@ abstract final class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.orange,
-          foregroundColor: AppColors.white,
+          foregroundColor: AppColors.charcoal,
+          minimumSize: const Size(48, 48),
           disabledBackgroundColor: AppColors.grayLight.withValues(alpha: 0.4),
           disabledForegroundColor: AppColors.white,
           padding: const EdgeInsets.symmetric(
@@ -139,11 +146,16 @@ abstract final class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          textStyle: AppTypography.inter(AppColors.white, fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: AppTypography.inter(
+            AppColors.charcoal,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          minimumSize: const Size(48, 48),
           foregroundColor: scheme.onSurface,
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xl,
@@ -153,21 +165,35 @@ abstract final class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          textStyle: AppTypography.inter(scheme.onSurface, fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: AppTypography.inter(
+            scheme.onSurface,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.orange,
-          textStyle: AppTypography.inter(AppColors.orange, fontSize: 15, fontWeight: FontWeight.w600),
+          foregroundColor: isDark ? AppColors.amber : AppColors.orangeText,
+          textStyle: AppTypography.inter(
+            isDark ? AppColors.amber : AppColors.orangeText,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: scheme.surface,
         selectedColor: AppColors.orange,
         side: BorderSide(color: borderColor),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
-        labelStyle: AppTypography.inter(scheme.onSurface, fontSize: 13, fontWeight: FontWeight.w500),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        labelStyle: AppTypography.inter(
+          scheme.onSurface,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -184,9 +210,13 @@ abstract final class AppTheme {
         indicatorColor: AppColors.orange.withValues(alpha: 0.16),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => AppTypography.inter(
-            states.contains(WidgetState.selected) ? AppColors.orangeText : scheme.onSurfaceVariant,
+            states.contains(WidgetState.selected)
+                ? AppColors.orangeText
+                : scheme.onSurfaceVariant,
             fontSize: 11,
-            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w500,
           ),
         ),
         iconTheme: WidgetStateProperty.resolveWith(
@@ -212,21 +242,76 @@ abstract final class GoogleFontsLike {
     final w = scheme.onSurface; // warm title color
     final b = scheme.onSurfaceVariant;
     return TextTheme(
-      displayLarge: AppTypography.sora(w, fontSize: 57, height: 1.12, letterSpacing: -1),
-      displayMedium: AppTypography.sora(w, fontSize: 45, height: 1.15, letterSpacing: -0.5),
+      displayLarge: AppTypography.sora(
+        w,
+        fontSize: 57,
+        height: 1.12,
+        letterSpacing: -1,
+      ),
+      displayMedium: AppTypography.sora(
+        w,
+        fontSize: 45,
+        height: 1.15,
+        letterSpacing: -0.5,
+      ),
       displaySmall: AppTypography.sora(w, fontSize: 36, height: 1.2),
-      headlineLarge: AppTypography.sora(w, fontSize: 32, height: 1.25, fontWeight: FontWeight.w700),
-      headlineMedium: AppTypography.sora(w, fontSize: 28, height: 1.3, fontWeight: FontWeight.w700),
-      headlineSmall: AppTypography.sora(w, fontSize: 24, height: 1.35, fontWeight: FontWeight.w700),
-      titleLarge: AppTypography.sora(w, fontSize: 20, height: 1.4, fontWeight: FontWeight.w700),
-      titleMedium: AppTypography.inter(w, fontSize: 16, height: 1.4, fontWeight: FontWeight.w600),
-      titleSmall: AppTypography.inter(w, fontSize: 14, height: 1.4, fontWeight: FontWeight.w600),
+      headlineLarge: AppTypography.sora(
+        w,
+        fontSize: 32,
+        height: 1.25,
+        fontWeight: FontWeight.w700,
+      ),
+      headlineMedium: AppTypography.sora(
+        w,
+        fontSize: 28,
+        height: 1.3,
+        fontWeight: FontWeight.w700,
+      ),
+      headlineSmall: AppTypography.sora(
+        w,
+        fontSize: 24,
+        height: 1.35,
+        fontWeight: FontWeight.w700,
+      ),
+      titleLarge: AppTypography.sora(
+        w,
+        fontSize: 20,
+        height: 1.4,
+        fontWeight: FontWeight.w700,
+      ),
+      titleMedium: AppTypography.inter(
+        w,
+        fontSize: 16,
+        height: 1.4,
+        fontWeight: FontWeight.w600,
+      ),
+      titleSmall: AppTypography.inter(
+        w,
+        fontSize: 14,
+        height: 1.4,
+        fontWeight: FontWeight.w600,
+      ),
       bodyLarge: AppTypography.inter(b, fontSize: 16, height: 1.5),
       bodyMedium: AppTypography.inter(b, fontSize: 14, height: 1.5),
       bodySmall: AppTypography.inter(b, fontSize: 12, height: 1.45),
-      labelLarge: AppTypography.inter(w, fontSize: 14, height: 1.3, fontWeight: FontWeight.w600),
-      labelMedium: AppTypography.inter(b, fontSize: 12, height: 1.3, fontWeight: FontWeight.w500),
-      labelSmall: AppTypography.inter(b, fontSize: 11, height: 1.3, fontWeight: FontWeight.w500),
+      labelLarge: AppTypography.inter(
+        w,
+        fontSize: 14,
+        height: 1.3,
+        fontWeight: FontWeight.w600,
+      ),
+      labelMedium: AppTypography.inter(
+        b,
+        fontSize: 12,
+        height: 1.3,
+        fontWeight: FontWeight.w500,
+      ),
+      labelSmall: AppTypography.inter(
+        b,
+        fontSize: 11,
+        height: 1.3,
+        fontWeight: FontWeight.w500,
+      ),
     );
   }
 }

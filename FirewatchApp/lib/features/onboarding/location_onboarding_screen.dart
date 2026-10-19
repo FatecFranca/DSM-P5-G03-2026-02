@@ -81,12 +81,12 @@ class _LocationOnboardingScreenState
                       children: [
                         Row(
                           children: [
-                            const _StepIndicator(step: 1, total: 3),
+                            const _StepIndicator(step: 1, total: 2),
                             const Spacer(),
                             TextButton(
                               onPressed: _skip,
                               style: TextButton.styleFrom(
-                                foregroundColor: AppColors.grayDark,
+                                foregroundColor: AppColors.orangeText,
                                 textStyle: AppTypography.inter(
                                   AppColors.grayDark,
                                   fontSize: 14,
@@ -104,21 +104,21 @@ class _LocationOnboardingScreenState
                         const SizedBox(height: AppSpacing.xxl),
                         Text(
                           'Onde você está?',
-                          textAlign: TextAlign.center,
+                          textAlign: TextAlign.left,
                           style: AppTypography.sora(
                             AppColors.charcoal,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
                         Text(
                           'O Firewatch usa sua latitude e longitude para buscar o clima do '
                           'local e calcular o risco de queimada.',
-                          textAlign: TextAlign.center,
+                          textAlign: TextAlign.left,
                           style: AppTypography.inter(
-                            AppColors.gray,
-                            fontSize: 15,
+                            AppColors.grayDark,
+                            fontSize: 16,
                             height: 1.5,
                           ),
                         ),
@@ -131,7 +131,7 @@ class _LocationOnboardingScreenState
                                   height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: AppColors.white,
+                                    color: AppColors.charcoal,
                                   ),
                                 )
                               : const Text('Permitir localização'),
@@ -219,13 +219,13 @@ class _LocationIllustration extends StatelessWidget {
           Container(
             width: size * 0.34,
             height: size * 0.34,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.orange,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(AppRadius.xxl),
             ),
             child: Icon(
               Icons.location_on_rounded,
-              color: AppColors.white,
+              color: AppColors.charcoal,
               size: size * 0.18,
             ),
           ),

@@ -54,11 +54,7 @@ class RiskBadge extends StatelessWidget {
 ///
 /// Representa a distribuição do espectro de risco (0–100%).
 class SegmentedRiskBar extends StatelessWidget {
-  const SegmentedRiskBar({
-    super.key,
-    required this.percent,
-    this.height = 12,
-  });
+  const SegmentedRiskBar({super.key, required this.percent, this.height = 12});
 
   final double percent;
   final double height;
@@ -70,7 +66,7 @@ class SegmentedRiskBar extends StatelessWidget {
       height: height,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          const segments = [0.34, 0.33, 0.33];
+          const segments = [0.30, 0.40, 0.30];
           const colors = [
             AppColors.riskLow,
             AppColors.riskModerate,
@@ -78,7 +74,10 @@ class SegmentedRiskBar extends StatelessWidget {
           ];
           final width = constraints.maxWidth;
           final filledWidth = width * (clamped / 100);
-          final markerLeft = (filledWidth - height / 2).clamp(0.0, width - height / 2);
+          final markerLeft = (filledWidth - height / 2).clamp(
+            0.0,
+            width - height / 2,
+          );
 
           final children = <Widget>[];
           double offset = 0;
@@ -91,7 +90,9 @@ class SegmentedRiskBar extends StatelessWidget {
                 height: height,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: isFilled ? colors[i] : colors[i].withValues(alpha: 0.28),
+                    color: isFilled
+                        ? colors[i]
+                        : colors[i].withValues(alpha: 0.28),
                     borderRadius: BorderRadius.horizontal(
                       left: i == 0 ? Radius.circular(height) : Radius.zero,
                       right: i == 2 ? Radius.circular(height) : Radius.zero,

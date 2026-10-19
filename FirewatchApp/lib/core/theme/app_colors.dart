@@ -30,6 +30,7 @@ abstract final class AppColors {
   static const Color riskLow = Color(0xFF22C55E);
   static const Color riskModerate = Color(0xFFFACC15);
   static const Color riskCritical = Color(0xFFDC2626);
+  static const Color riskCriticalText = Color(0xFF991B1B);
 
   // Fundos suaves por nível de risco
   static const Color riskLowSoft = Color(0xFFDCFCE7);
@@ -37,32 +38,28 @@ abstract final class AppColors {
   static const Color riskCriticalSoft = Color(0xFFFEE2E2);
 
   // Superfícies do tema escuro
-  static const Color darkBackground = Color(0xFF15110F);
-  static const Color darkSurface = Color(0xFF211B18);
-  static const Color darkSurfaceHigh = Color(0xFF2B2420);
-  static const Color darkBorder = Color(0xFF3A312C);
+  static const Color darkBackground = charcoal;
+  static const Color darkSurface = Color(0xFF292524);
+  static const Color darkSurfaceHigh = Color(0xFF44403C);
+  static const Color darkBorder = Color(0xFF44403C);
 
   // Splash (identidade escura, escopada apenas à tela inicial)
   static const Color splashBackground = Color(0xFF1C1917);
   static const Color splashGlowBrown = Color(0xFF5C2A0E);
   static const Color splashGlowOrange = Color(0xFFB23A00);
-  static const Color splashButton = Color(0xFFFF6D00);
+  static const Color splashButton = orange;
   static const Color splashButtonText = Color(0xFF1C1917);
-  static const Color splashTextPrimary = Color(0xFFF7F3EE);
+  static const Color splashTextPrimary = background;
   static const Color splashTextSecondary = Color(0xFFA8A29E);
-  static const Color splashTextMuted = Color(0xFF726B66);
+  static const Color splashTextMuted = grayLight;
 
   // Token de risco para texto
   static Color riskTextColor(RiskTone tone) => switch (tone) {
-        RiskTone.low => riskLow,
-        RiskTone.moderate => Color(0xFFB8860B),
-        RiskTone.critical => riskCritical,
-      };
+    RiskTone.low => charcoal,
+    RiskTone.moderate => charcoal,
+    RiskTone.critical => riskCriticalText,
+  };
 }
 
 /// Classificação de intensidade usada em textos e detalhes de risco.
-enum RiskTone {
-  low,
-  moderate,
-  critical,
-}
+enum RiskTone { low, moderate, critical }

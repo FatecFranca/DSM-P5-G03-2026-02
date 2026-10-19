@@ -15,6 +15,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../services/api_service.dart';
+import '../../shared/widgets/risk_result_sheet.dart';
 
 /// Fonte dos tiles do mapa. Substituível em testes para evitar rede.
 final mapTileProviderProvider = Provider<TileProvider>(
@@ -77,11 +78,13 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
     super.dispose();
   }
 
-  LatLng get _center =>
-      LatLng(_coordinates!.latitude, _coordinates!.longitude);
+  LatLng get _center => LatLng(_coordinates!.latitude, _coordinates!.longitude);
 
   /// Verifica se uma previsão corresponde às coordenadas atuais.
-  bool _matchesCoordinates(RiskPrediction prediction, GeoCoordinates coordinates) {
+  bool _matchesCoordinates(
+    RiskPrediction prediction,
+    GeoCoordinates coordinates,
+  ) {
     const tolerance = 0.0001;
     return (prediction.latitude - coordinates.latitude).abs() < tolerance &&
         (prediction.longitude - coordinates.longitude).abs() < tolerance;
@@ -136,7 +139,9 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
     if (coordinates == null) return;
     setState(() => _loadingLocation = true);
     try {
-      final name = await ref.read(geocodingServiceProvider).reverse(coordinates);
+      final name = await ref
+          .read(geocodingServiceProvider)
+          .reverse(coordinates);
       if (!mounted) return;
       setState(() {
         _locationName = name;
@@ -171,20 +176,21 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
       setState(() => _verifying = false);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(_errorMessage(error))),
-        );
+        ..showSnackBar(SnackBar(content: Text(_errorMessage(error))));
     }
   }
 
   void _showRiskResult(RiskPrediction prediction) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.panelBackground,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (context) => _RiskResultSheet(prediction: prediction),
+      builder: (context) =>
+          RiskResultSheet(prediction: prediction, locationName: _locationName),
     );
   }
 
@@ -198,7 +204,9 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
     if (last == null) return '';
     final difference = DateTime.now().difference(last);
     if (difference.inSeconds < 60) return 'atualizado agora';
-    if (difference.inMinutes < 60) return 'atualizado há ${difference.inMinutes} min';
+    if (difference.inMinutes < 60) {
+      return 'atualizado há ${difference.inMinutes} min';
+    }
     return 'atualizado há ${difference.inHours} h';
   }
 
@@ -234,7 +242,8 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _LocationCard(
-                            title: _locationName ??
+                            title:
+                                _locationName ??
                                 (_loadingLocation
                                     ? 'Localizando…'
                                     : 'Localização selecionada'),
@@ -410,10 +419,7 @@ class _LocationCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   coordinates.label,
-                  style: AppTypography.mono(
-                    AppColors.gray,
-                    fontSize: 12.5,
-                  ),
+                  style: AppTypography.mono(AppColors.gray, fontSize: 12.5),
                 ),
               ],
             ),
@@ -810,134 +816,6 @@ class _MetricCard extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// Painel com o resultado real da verificação de risco.
-class _RiskResultSheet extends StatelessWidget {
-  const _RiskResultSheet({required this.prediction});
-
-  final RiskPrediction prediction;
-
-  @override
-  Widget build(BuildContext context) {
-    final level = prediction.level;
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.page,
-          AppSpacing.sm,
-          AppSpacing.page,
-          AppSpacing.xl,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: level.softColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.warning_amber_rounded,
-                    color: level.textColor,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Risco de queimada',
-                        style: AppTypography.inter(
-                          AppColors.gray,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        level.label,
-                        style: AppTypography.sora(
-                          level.textColor,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  prediction.percentageLabel,
-                  style: AppTypography.mono(
-                    level.textColor,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: prediction.probability,
-                minHeight: 8,
-                color: level.color,
-                backgroundColor: AppColors.metricCard,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              prediction.recommendation.isEmpty
-                  ? 'Sem recomendação disponível para estas condições.'
-                  : prediction.recommendation,
-              style: AppTypography.inter(
-                AppColors.charcoal,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Row(
-              children: [
-                const Icon(
-                  Icons.place_outlined,
-                  size: 16,
-                  color: AppColors.gray,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${prediction.latitude.toStringAsFixed(4)}, '
-                  '${prediction.longitude.toStringAsFixed(4)}',
-                  style: AppTypography.mono(
-                    AppColors.gray,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

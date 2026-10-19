@@ -12,7 +12,11 @@ import '../../shared/widgets/flame_logo.dart';
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  static const _locations = ['Franca, SP', 'Ribeirão Preto, SP', 'São Paulo, SP'];
+  static const _locations = [
+    'Franca, SP',
+    'Ribeirão Preto, SP',
+    'São Paulo, SP',
+  ];
   static const _updates = ['A cada hora', 'A cada 3 horas', 'A cada 6 horas'];
 
   @override
@@ -43,156 +47,177 @@ class SettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
         children: [
           // Aparência.
-          _Section(title: 'Aparência', children: [
-            _SettingsTile(
-              icon: Icons.palette_outlined,
-              title: 'Tema',
-              subtitle: isDark ? 'Tema escuro' : 'Tema claro',
-              trailing: SegmentedButton<bool>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Claro'), icon: Icon(Icons.light_mode_outlined, size: 18)),
-                  ButtonSegment(value: true, label: Text('Escuro'), icon: Icon(Icons.dark_mode_outlined, size: 18)),
-                ],
-                selected: {isDark},
-                onSelectionChanged: (selection) {
-                  ref.read(themeModeProvider.notifier).state =
-                      selection.first ? ThemeMode.dark : ThemeMode.light;
-                },
-                style: ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  textStyle: WidgetStatePropertyAll(
-                    AppTypography.inter(
-                      Theme.of(context).colorScheme.onSurface,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+          _Section(
+            title: 'Aparência',
+            children: [
+              _SettingsTile(
+                icon: Icons.palette_outlined,
+                title: 'Tema',
+                subtitle: isDark ? 'Tema escuro' : 'Tema claro',
+                trailing: SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(
+                      value: false,
+                      label: Text('Claro'),
+                      icon: Icon(Icons.light_mode_outlined, size: 18),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      label: Text('Escuro'),
+                      icon: Icon(Icons.dark_mode_outlined, size: 18),
+                    ),
+                  ],
+                  selected: {isDark},
+                  onSelectionChanged: (selection) {
+                    ref.read(themeModeProvider.notifier).state = selection.first
+                        ? ThemeMode.dark
+                        : ThemeMode.light;
+                  },
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: WidgetStatePropertyAll(
+                      AppTypography.inter(
+                        Theme.of(context).colorScheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ]),
+            ],
+          ),
 
           // Localização.
-          _Section(title: 'Localização', children: [
-            _SettingsTile(
-              icon: Icons.location_on_outlined,
-              title: 'Localização selecionada',
-              subtitle: location,
-              trailing: Icon(
-                Icons.keyboard_arrow_right_rounded,
-                color: AppColors.grayLight,
-              ),
-              onTap: () async {
-                final selected = await showModalBottomSheet<String>(
-                  context: context,
-                  showDragHandle: true,
-                  builder: (context) => SafeArea(
-                    child: ListView(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                      children: [
-                        for (final loc in _locations)
-                          ListTile(
-                            leading: Icon(
-                              loc == location
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_off,
-                              color: loc == location
-                                  ? AppColors.orange
-                                  : null,
+          _Section(
+            title: 'Localização',
+            children: [
+              _SettingsTile(
+                icon: Icons.location_on_outlined,
+                title: 'Localização selecionada',
+                subtitle: location,
+                trailing: Icon(
+                  Icons.keyboard_arrow_right_rounded,
+                  color: AppColors.grayLight,
+                ),
+                onTap: () async {
+                  final selected = await showModalBottomSheet<String>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (context) => SafeArea(
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                        children: [
+                          for (final loc in _locations)
+                            ListTile(
+                              leading: Icon(
+                                loc == location
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_off,
+                                color: loc == location
+                                    ? AppColors.orange
+                                    : null,
+                              ),
+                              title: Text(loc),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
+                              ),
+                              onTap: () => Navigator.of(context).pop(loc),
                             ),
-                            title: Text(loc),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                            ),
-                            onTap: () => Navigator.of(context).pop(loc),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                );
-                if (selected != null) {
-                  ref.read(locationProvider.notifier).state = selected;
-                }
-              },
-            ),
-          ]),
+                  );
+                  if (selected != null) {
+                    ref.read(locationProvider.notifier).state = selected;
+                  }
+                },
+              ),
+            ],
+          ),
 
           // Notificações.
-          _Section(title: 'Notificações', children: [
-            _SwitchTile(
-              icon: Icons.warning_amber_rounded,
-              title: 'Alertas de risco',
-              value: notifications['riskAlerts'] ?? false,
-              onChanged: (v) => setNotification('riskAlerts', v),
-            ),
-            _SwitchTile(
-              icon: Icons.cloud_outlined,
-              title: 'Atualizações meteorológicas',
-              value: notifications['weatherUpdates'] ?? false,
-              onChanged: (v) => setNotification('weatherUpdates', v),
-            ),
-            _SwitchTile(
-              icon: Icons.eco_outlined,
-              title: 'Dicas de prevenção',
-              value: notifications['preventionTips'] ?? false,
-              onChanged: (v) => setNotification('preventionTips', v),
-            ),
-          ]),
+          _Section(
+            title: 'Notificações',
+            children: [
+              _SwitchTile(
+                icon: Icons.warning_amber_rounded,
+                title: 'Alertas de risco',
+                value: notifications['riskAlerts'] ?? false,
+                onChanged: (v) => setNotification('riskAlerts', v),
+              ),
+              _SwitchTile(
+                icon: Icons.cloud_outlined,
+                title: 'Atualizações meteorológicas',
+                value: notifications['weatherUpdates'] ?? false,
+                onChanged: (v) => setNotification('weatherUpdates', v),
+              ),
+              _SwitchTile(
+                icon: Icons.eco_outlined,
+                title: 'Dicas de prevenção',
+                value: notifications['preventionTips'] ?? false,
+                onChanged: (v) => setNotification('preventionTips', v),
+              ),
+            ],
+          ),
 
           // Atualização.
-          _Section(title: 'Preferências de atualização', children: [
-            _SettingsTile(
-              icon: Icons.refresh_rounded,
-              title: 'Frequência de atualização',
-              subtitle: 'Visual (demonstrativo)',
-              trailing: _UpdateMenu(updates: _updates),
-            ),
-          ]),
+          _Section(
+            title: 'Preferências de atualização',
+            children: [
+              _SettingsTile(
+                icon: Icons.refresh_rounded,
+                title: 'Frequência de atualização',
+                subtitle: 'Visual (demonstrativo)',
+                trailing: _UpdateMenu(updates: _updates),
+              ),
+            ],
+          ),
 
           // Sobre.
-          _Section(title: 'Sobre o aplicativo', children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-              child: Center(child: FlameLogo(size: 64)),
-            ),
-            const Center(
-              child: Text(
-                AppConstants.appName,
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          _Section(
+            title: 'Sobre o aplicativo',
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                child: Center(child: FlameLogo(size: 64)),
               ),
-            ),
-            const SizedBox(height: 2),
-            Center(
-              child: Text(
-                AppConstants.slogan,
-                style: AppTypography.inter(
-                  AppColors.gray,
-                  fontSize: 12,
+              Center(
+                child: FirewatchWordmarkText(
+                  width: 160,
+                  light: Theme.of(context).brightness == Brightness.dark,
                 ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.info_outline_rounded),
-              title: const Text('Versão'),
-              trailing: Text(
-                AppConstants.version,
-                style: AppTypography.mono(
-                  AppColors.grayDark,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(height: 2),
+              Center(
+                child: Text(
+                  AppConstants.slogan,
+                  style: AppTypography.inter(AppColors.gray, fontSize: 12),
                 ),
               ),
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Firewatch ${AppConstants.version}'),
+              const SizedBox(height: AppSpacing.md),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.info_outline_rounded),
+                title: const Text('Versão'),
+                trailing: Text(
+                  AppConstants.version,
+                  style: AppTypography.mono(
+                    AppColors.grayDark,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Firewatch ${AppConstants.version}')),
                 ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ],
       ),
     );
@@ -279,11 +304,7 @@ class _SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(
-        icon,
-        color: AppColors.orange,
-        size: 22,
-      ),
+      leading: Icon(icon, color: AppColors.orange, size: 22),
       title: Text(
         title,
         style: AppTypography.inter(
@@ -296,10 +317,7 @@ class _SettingsTile extends StatelessWidget {
           ? null
           : Text(
               subtitle!,
-              style: AppTypography.inter(
-                AppColors.gray,
-                fontSize: 12.5,
-              ),
+              style: AppTypography.inter(AppColors.gray, fontSize: 12.5),
             ),
       trailing: trailing,
       onTap: onTap,

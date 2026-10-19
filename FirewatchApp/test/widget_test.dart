@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:firewatch/app.dart';
+import 'package:firewatch/shared/widgets/flame_logo.dart';
 import 'package:firewatch/core/providers/app_providers.dart';
 import 'package:firewatch/features/monitoring/monitoring_screen.dart';
 import 'package:firewatch/services/api_service.dart';
@@ -66,7 +67,11 @@ MockClient _apiMockClient() {
         headers: {'content-type': 'application/json'},
       );
     }
-    return http.Response('{}', 200, headers: {'content-type': 'application/json'});
+    return http.Response(
+      '{}',
+      200,
+      headers: {'content-type': 'application/json'},
+    );
   });
 }
 
@@ -81,32 +86,30 @@ MockClient _geocodingMockClient() {
 }
 
 List<Override> _testOverrides() => [
-      apiServiceProvider.overrideWithValue(
-        ApiService(client: _apiMockClient(), baseUrl: 'https://api.example.test'),
-      ),
-      geocodingServiceProvider.overrideWithValue(
-        GeocodingService(client: _geocodingMockClient()),
-      ),
-      mapTileProviderProvider.overrideWithValue(_FakeTileProvider()),
-    ];
+  apiServiceProvider.overrideWithValue(
+    ApiService(client: _apiMockClient(), baseUrl: 'https://api.example.test'),
+  ),
+  geocodingServiceProvider.overrideWithValue(
+    GeocodingService(client: _geocodingMockClient()),
+  ),
+  mapTileProviderProvider.overrideWithValue(_FakeTileProvider()),
+];
 
 Future<void> _pumpApp(WidgetTester tester, {List<Override>? overrides}) async {
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: overrides ?? const [],
-      child: FirewatchApp(),
-    ),
+    ProviderScope(overrides: overrides ?? const [], child: FirewatchApp()),
   );
   await tester.pump();
 }
 
 void main() {
-  testWidgets('abre na splash e navega para o onboarding de localização',
-      (tester) async {
+  testWidgets('abre na splash e navega para o onboarding de localização', (
+    tester,
+  ) async {
     await _pumpApp(tester);
 
     // Splash exibe nome e frase.
-    expect(find.text('firewatch'), findsWidgets);
+    expect(find.byType(FirewatchWordmarkText), findsOneWidget);
 
     // Toca em "Começar" para avançar.
     await tester.tap(find.text('Começar'));
@@ -158,8 +161,9 @@ void main() {
     expect(find.text('Como se proteger'), findsOneWidget);
   });
 
-  testWidgets('coordenadas confirmadas abrem o mapa de monitoramento',
-      (tester) async {
+  testWidgets('coordenadas confirmadas abrem o mapa de monitoramento', (
+    tester,
+  ) async {
     await _pumpApp(tester, overrides: _testOverrides());
 
     // Boas-vindas -> onboarding -> formulário de coordenadas.
@@ -199,8 +203,9 @@ void main() {
     tester.takeException();
   });
 
-  testWidgets('mostra erro e permanece no formulário quando a consulta falha',
-      (tester) async {
+  testWidgets('mostra erro e permanece no formulário quando a consulta falha', (
+    tester,
+  ) async {
     final overrides = <Override>[
       apiServiceProvider.overrideWithValue(
         ApiService(

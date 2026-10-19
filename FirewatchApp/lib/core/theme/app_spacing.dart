@@ -8,14 +8,15 @@ abstract final class AppSpacing {
   static const double lg = 16;
   static const double xl = 24;
   static const double xxl = 32;
-  static const double page = 20;
+  static const double page = 24;
 }
 
 abstract final class AppRadius {
-  static const double sm = 10;
+  static const double sm = 8;
   static const double md = 14;
-  static const double lg = 18;
-  static const double xl = 24;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double xxl = 28;
   static const double pill = 999;
 }
 
@@ -23,18 +24,18 @@ class AppShadows {
   const AppShadows._();
 
   static List<BoxShadow> card(Color color) => [
-        BoxShadow(
-          color: color.withValues(alpha: 0.06),
-          blurRadius: 18,
-          offset: const Offset(0, 6),
-        ),
-      ];
+    BoxShadow(
+      color: color.withValues(alpha: 0.06),
+      blurRadius: 18,
+      offset: const Offset(0, 6),
+    ),
+  ];
 
   static List<BoxShadow> soft(Color color) => [
-        BoxShadow(
-          color: color.withValues(alpha: 0.10),
-          blurRadius: 24,
-          offset: const Offset(0, 10),
-        ),
-      ];
+    BoxShadow(
+      color: color.withValues(alpha: 0.10),
+      blurRadius: 24,
+      offset: const Offset(0, 10),
+    ),
+  ];
 }
