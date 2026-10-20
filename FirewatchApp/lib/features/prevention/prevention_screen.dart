@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/data/demo_data.dart';
+import '../../core/data/prevention_content.dart';
 import '../../core/models/prevention_tip.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -68,18 +68,14 @@ class _PreventionScreenState extends State<PreventionScreen> {
                   Container(
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.orangeDark, AppColors.orange],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: AppColors.orange,
                       borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                     child: Row(
                       children: [
                         const Icon(
                           Icons.emergency_share_outlined,
-                          color: Colors.white,
+                          color: AppColors.charcoal,
                           size: 30,
                         ),
                         const SizedBox(width: AppSpacing.md),
@@ -90,7 +86,7 @@ class _PreventionScreenState extends State<PreventionScreen> {
                               Text(
                                 'Em caso de emergência',
                                 style: AppTypography.inter(
-                                  Colors.white,
+                                  AppColors.charcoal,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -99,7 +95,7 @@ class _PreventionScreenState extends State<PreventionScreen> {
                               Text(
                                 'Bombeiros 193 · Defesa Civil 199',
                                 style: AppTypography.inter(
-                                  Colors.white.withValues(alpha: 0.92),
+                                  AppColors.charcoal,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -114,7 +110,7 @@ class _PreventionScreenState extends State<PreventionScreen> {
 
                   const SectionTitle(title: 'Como se proteger'),
                   const SizedBox(height: AppSpacing.md),
-                  for (final tip in DemoSettings.preventionTips)
+                  for (final tip in PreventionContent.tips)
                     _PreventionCard(
                       tip: tip,
                       onToggle: () => _toggle(tip.title),
@@ -130,10 +126,7 @@ class _PreventionScreenState extends State<PreventionScreen> {
 }
 
 class _PreventionCard extends StatelessWidget {
-  const _PreventionCard({
-    required this.tip,
-    required this.onToggle,
-  });
+  const _PreventionCard({required this.tip, required this.onToggle});
 
   final PreventionTip tip;
   final VoidCallback onToggle;
@@ -147,17 +140,19 @@ class _PreventionCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Material(
-      color: tip.emphasis ? const Color(0xFFFFF3EA) : scheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(
-          color: tip.emphasis
-              ? AppColors.orange.withValues(alpha: 0.35)
-              : border,
+        color: tip.emphasis
+            ? scheme.primary.withValues(alpha: isDark ? 0.12 : 0.06)
+            : scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: BorderSide(
+            color: tip.emphasis
+                ? AppColors.orange.withValues(alpha: 0.35)
+                : border,
+          ),
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -180,10 +175,7 @@ class _PreventionCard extends StatelessWidget {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               'Toque para saber mais',
-              style: AppTypography.inter(
-                scheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
+              style: AppTypography.inter(scheme.onSurfaceVariant, fontSize: 12),
             ),
           ),
           childrenPadding: const EdgeInsets.fromLTRB(
@@ -204,28 +196,9 @@ class _PreventionCard extends StatelessWidget {
                 height: 1.55,
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: 3,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.amber.withValues(alpha: 0.24),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-              child: Text(
-                'Exemplo demonstrativo',
-                style: AppTypography.inter(
-                  AppColors.orangeText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
           ],
         ),
-    ),
+      ),
     );
   }
 }

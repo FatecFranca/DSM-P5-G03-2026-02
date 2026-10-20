@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
@@ -56,12 +57,12 @@ class AppHeader extends StatelessWidget {
                     ),
             ),
             IconButton(
-              onPressed: onNotifications,
+              onPressed: onNotifications ?? () => context.go('/alerts'),
               icon: const Icon(Icons.notifications_none_rounded),
               tooltip: 'Notificações',
             ),
             IconButton(
-              onPressed: onSettings,
+              onPressed: onSettings ?? () => context.push('/settings'),
               icon: const Icon(Icons.settings_outlined),
               tooltip: 'Configurações',
             ),

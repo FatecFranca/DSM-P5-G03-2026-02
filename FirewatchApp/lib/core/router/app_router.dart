@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/alerts/alerts_screen.dart';
-import '../../features/forecast/forecast_screen.dart';
-import '../../features/map/map_screen.dart';
 import '../../features/monitoring/monitoring_screen.dart';
 import '../../features/onboarding/coordinates_screen.dart';
 import '../../features/onboarding/location_onboarding_screen.dart';
@@ -41,7 +39,7 @@ abstract final class AppRouter {
         ),
 
         // Navegação inferior com estado preservado por aba.
-        // A aba Início (/) é a tela de mapa/monitoramento.
+        // Uma única experiência de mapa e consulta real.
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) =>
               AppShell(navigationShell: navigationShell),
@@ -51,22 +49,6 @@ abstract final class AppRouter {
                 GoRoute(
                   path: '/',
                   builder: (context, state) => const MonitoringScreen(),
-                ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: '/forecast',
-                  builder: (context, state) => const ForecastScreen(),
-                ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: '/map',
-                  builder: (context, state) => const MapScreen(),
                 ),
               ],
             ),
@@ -88,6 +70,9 @@ abstract final class AppRouter {
             ),
           ],
         ),
+
+        GoRoute(path: '/map', redirect: (_, _) => '/'),
+        GoRoute(path: '/forecast', redirect: (_, _) => '/'),
 
         // Telas abertas por cima da navegação inferior.
         GoRoute(

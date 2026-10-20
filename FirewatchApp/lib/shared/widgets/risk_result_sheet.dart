@@ -141,6 +141,38 @@ class RiskResultSheet extends StatelessWidget {
                   ],
                 ),
               ),
+              if (prediction.classProbabilities.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Probabilidades das classes',
+                  style: TextStyle(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                for (final item in const [
+                  ('risco_baixo', 'Baixo'),
+                  ('risco_moderado', 'Moderado'),
+                  ('risco_critico', 'Crítico'),
+                ])
+                  if (prediction.classProbabilities[item.$1] != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        '${item.$2}: ${(prediction.classProbabilities[item.$1]! * 100).toStringAsFixed(1)}%',
+                        style: TextStyle(color: scheme.onSurface),
+                      ),
+                    ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'A classificação acima é a devolvida pela API. Essas probabilidades descrevem as classes do modelo, não a confirmação de incêndio.',
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.xl),
               _MetricRow(
                 children: [

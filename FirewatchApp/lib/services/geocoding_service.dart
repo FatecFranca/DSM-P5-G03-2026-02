@@ -14,6 +14,12 @@ class GeocodingException implements Exception {
   String toString() => message;
 }
 
+class PlaceResult {
+  const PlaceResult({required this.label, required this.coordinates});
+  final String label;
+  final GeoCoordinates coordinates;
+}
+
 /// Resolve o nome da cidade/estado a partir de coordenadas usando o
 /// Nominatim (OpenStreetMap), serviço gratuito que não exige chave de API.
 class GeocodingService {
@@ -27,6 +33,51 @@ class GeocodingService {
   static final Map<String, String> _cache = {};
 
   void close() => _client.close();
+
+  /// Busca explícita de cidades; não dispara requisições a cada tecla.
+  Future<List<PlaceResult>> search(String name) async {
+    final uri = Uri.https('geocoding-api.open-meteo.com', '/v1/search', {
+      'name': name.trim(),
+      'count': '5',
+      'language': 'pt',
+      'format': 'json',
+      'countryCode': 'BR',
+    });
+    final response = await _client.get(uri).timeout(_timeout);
+    if (response.statusCode != 200) {
+      throw const GeocodingException('Busca de cidades indisponível.');
+    }
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (decoded is! Map<String, dynamic>) {
+      throw const GeocodingException('Resposta de busca inválida.');
+    }
+    final results = decoded['results'];
+    if (results == null) return [];
+    if (results is! List) {
+      throw const GeocodingException('Resultados inválidos.');
+    }
+    return [
+      for (final item in results)
+        if (item is Map &&
+            item['name'] is String &&
+            item['latitude'] is num &&
+            item['longitude'] is num &&
+            (item['latitude'] as num).toDouble().isFinite &&
+            (item['longitude'] as num).toDouble().isFinite &&
+            (item['latitude'] as num).abs() <= 90 &&
+            (item['longitude'] as num).abs() <= 180)
+          PlaceResult(
+            label: [
+              item['name'],
+              item['admin1'],
+            ].whereType<String>().where((s) => s.isNotEmpty).join(', '),
+            coordinates: GeoCoordinates(
+              latitude: (item['latitude'] as num).toDouble(),
+              longitude: (item['longitude'] as num).toDouble(),
+            ),
+          ),
+    ];
+  }
 
   /// Retorna um rótulo legível (ex.: "Franca, SP") ou `null` quando o
   /// serviço não consegue identificar a cidade.
@@ -46,10 +97,15 @@ class GeocodingService {
     final http.Response response;
     try {
       response = await _client
-          .get(uri, headers: {'User-Agent': _userAgent, 'Accept': 'application/json'})
+          .get(
+            uri,
+            headers: {'User-Agent': _userAgent, 'Accept': 'application/json'},
+          )
           .timeout(_timeout);
     } catch (error) {
-      throw GeocodingException('Não foi possível consultar o nome do local: $error');
+      throw GeocodingException(
+        'Não foi possível consultar o nome do local: $error',
+      );
     }
 
     if (response.statusCode != 200) {

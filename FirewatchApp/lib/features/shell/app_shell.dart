@@ -3,11 +3,13 @@ import 'package:go_router/go_router.dart';
 
 /// Telas acessíveis pela navegação inferior.
 enum ShellDestination {
-  home('Início', Icons.home_outlined, Icons.home_rounded),
-  forecast('Previsão', Icons.show_chart_outlined, Icons.show_chart_rounded),
   map('Mapa', Icons.map_outlined, Icons.map_rounded),
   alerts('Alertas', Icons.notifications_outlined, Icons.notifications_rounded),
-  prevention('Prevenção', Icons.health_and_safety_outlined, Icons.health_and_safety_rounded);
+  prevention(
+    'Prevenção',
+    Icons.health_and_safety_outlined,
+    Icons.health_and_safety_rounded,
+  );
 
   const ShellDestination(this.label, this.icon, this.activeIcon);
 

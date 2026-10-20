@@ -19,7 +19,9 @@ class DemoBadge extends StatelessWidget {
         vertical: compact ? 3 : AppSpacing.xs + 2,
       ),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.orange.withValues(alpha: 0.14) : AppColors.amber.withValues(alpha: 0.28),
+        color: isDark
+            ? AppColors.orange.withValues(alpha: 0.14)
+            : AppColors.amber.withValues(alpha: 0.28),
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
@@ -63,20 +65,19 @@ class SectionTitle extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style: AppTypography.sora(
-            Theme.of(context).colorScheme.onSurface,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            height: 1.2,
+        Expanded(
+          child: Text(
+            title,
+            style: AppTypography.sora(
+              Theme.of(context).colorScheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
           ),
         ),
         if (action != null)
-          TextButton(
-            onPressed: onAction,
-            child: Text(action!),
-          ),
+          TextButton(onPressed: onAction, child: Text(action!)),
       ],
     );
   }

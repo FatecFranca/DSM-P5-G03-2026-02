@@ -53,6 +53,7 @@ class RiskPrediction {
     required this.percentageLabel,
     required this.recommendation,
     this.alertColorHex,
+    this.classProbabilities = const {},
   });
 
   final double latitude;
@@ -62,6 +63,9 @@ class RiskPrediction {
 
   /// Probabilidade de 0.0 a 1.0 retornada pelo modelo.
   final double probability;
+
+  /// Probabilidades individuais devolvidas pela VM; não reclassifica no app.
+  final Map<String, double> classProbabilities;
 
   /// Texto da porcentagem já formatado pela API (ex.: "72.5%").
   final String percentageLabel;
@@ -84,7 +88,7 @@ class RiskPrediction {
     final probability = probabilityValue is num
         ? probabilityValue.toDouble()
         : double.tryParse(probabilityValue?.toString() ?? '') ??
-            _probabilityFromPercent(prediction['porcentagem']);
+              _probabilityFromPercent(prediction['porcentagem']);
 
     return RiskPrediction(
       latitude: _asDouble(localization['latitude']) ?? 0,
@@ -93,9 +97,19 @@ class RiskPrediction {
       level: riskLevelFromApi(rawLevel),
       probability: probability.clamp(0.0, 1.0),
       percentageLabel:
-          prediction['porcentagem']?.toString() ?? '${(probability * 100).toStringAsFixed(1)}%',
+          prediction['porcentagem']?.toString() ??
+          '${(probability * 100).toStringAsFixed(1)}%',
       recommendation: prediction['recomendacao']?.toString() ?? '',
       alertColorHex: prediction['cor_alerta']?.toString(),
+      classProbabilities: {
+        if (prediction['probabilidades'] is Map)
+          for (final entry in (prediction['probabilidades'] as Map).entries)
+            if (entry.value is num && (entry.value as num).toDouble().isFinite)
+              entry.key.toString(): (entry.value as num).toDouble().clamp(
+                0.0,
+                1.0,
+              ),
+      },
     );
   }
 }
@@ -107,7 +121,10 @@ RiskLevel riskLevelFromApi(String value) {
     return RiskLevel.critical;
   }
   if (normalized.startsWith('MOD')) return RiskLevel.moderate;
-  return RiskLevel.low;
+  if (normalized == 'BAIXO' || normalized == 'RISCO BAIXO') {
+    return RiskLevel.low;
+  }
+  throw FormatException('Nível de risco desconhecido: $value');
 }
 
 Map<String, dynamic> _asMap(Object? value) {
