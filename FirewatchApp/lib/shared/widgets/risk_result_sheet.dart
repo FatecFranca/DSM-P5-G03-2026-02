@@ -13,10 +13,12 @@ class RiskResultSheet extends StatelessWidget {
     super.key,
     required this.prediction,
     this.locationName,
+    this.contextNote,
   });
 
   final RiskPrediction prediction;
   final String? locationName;
+  final String? contextNote;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +75,16 @@ class RiskResultSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.xl),
+              if (contextNote != null) ...[
+                Text(
+                  contextNote!,
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
               Container(
                 padding: const EdgeInsets.all(AppSpacing.xl),
                 decoration: BoxDecoration(

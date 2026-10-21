@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'fixtures/regional_response.dart';
 
 /// Tile transparente de 1x1 usado para não acessar a rede nos testes.
 final Uint8List _transparentTile = base64Decode(
@@ -70,6 +71,11 @@ const String _geocodingResponseJson = '''
 
 MockClient _apiMockClient() {
   return MockClient((request) async {
+    if (request.url.path == '/api/v1/risco-regional') {
+      final json = regionalResponse();
+      json['centro'] = jsonDecode(request.body);
+      return http.Response(jsonEncode(json), 200);
+    }
     if (request.url.path.contains('prever-risco')) {
       final response = jsonDecode(_riskResponseJson) as Map<String, dynamic>;
       response['localizacao'] = jsonDecode(request.body);
@@ -208,6 +214,28 @@ void main() {
     expect((await IntroPreferences.load()).completed, isTrue);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('análise regional pinta zonas e abre a mesma classe pela lista', (
+    tester,
+  ) async {
+    await _openMap(tester);
+    expect(find.byType(PolygonLayer), findsNothing);
+    await tester.tap(find.text('Analisar esta região'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PolygonLayer), findsOneWidget);
+    expect(find.text('9 de 9 zonas com dados · API FireWatch'), findsOneWidget);
+    await tester.ensureVisible(find.text('Ver 9 zonas'));
+    await tester.tap(find.text('Ver 9 zonas'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zona 1 · Moderado'));
+    await tester.pumpAndSettle();
+    expect(find.text('10.0%'), findsOneWidget);
+    expect(
+      find.textContaining('Estimativa regional a partir de um ponto'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('splash aguarda o toque e mantém as opções de localização', (
     tester,
   ) async {
@@ -389,6 +417,18 @@ void main() {
     tester.platformDispatcher.textScaleFactorTestValue = 1.4;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Analisar esta região'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PolygonLayer), findsOneWidget);
+    await tester.ensureVisible(find.text('Ver 9 zonas'));
+    await tester.tap(find.text('Ver 9 zonas'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zona 1 · Moderado'));
+    await tester.pumpAndSettle();
+    expect(find.text('10.0%'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('Fechar resultado'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Prevenção'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Prevenção de queimadas'));
@@ -397,6 +437,62 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Exemplo demonstrativo'), findsNothing);
   });
+  testWidgets('trocar coordenadas remove a camada da região anterior', (
+    tester,
+  ) async {
+    await _openMap(tester);
+    await tester.tap(find.text('Analisar esta região'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PolygonLayer), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MonitoringScreen)),
+    );
+    container.read(coordinatesProvider.notifier).state = const GeoCoordinates(
+      latitude: -21.1704,
+      longitude: -47.8103,
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(PolygonLayer), findsNothing);
+    expect(find.text('Ver 9 zonas'), findsNothing);
+    expect(container.read(riskPredictionProvider)!.latitude, -21.1704);
+    expect(tester.takeException(), isNull);
+  });
+  for (final detail in [false, true]) {
+    testWidgets(
+      'vencimento neutraliza ${detail ? 'detalhe' : 'lista'} já aberto',
+      (tester) async {
+        await _openMap(tester);
+        await tester.tap(find.text('Analisar esta região'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Ver 9 zonas'));
+        await tester.tap(find.text('Ver 9 zonas'));
+        await tester.pumpAndSettle();
+        if (detail) {
+          await tester.tap(find.text('Zona 1 · Moderado'));
+          await tester.pumpAndSettle();
+          expect(find.text('10.0%'), findsOneWidget);
+        }
+        await tester.pump(const Duration(minutes: 6));
+        await tester.pumpAndSettle();
+        if (detail) {
+          expect(find.text('10.0%'), findsNothing);
+          expect(
+            find.text(
+              'Dados vencidos ou indisponíveis. Analise a região novamente para atualizar.',
+            ),
+            findsOneWidget,
+          );
+        } else {
+          expect(find.text('Zona 1 · Moderado'), findsNothing);
+          expect(
+            find.text('Zona 1 · Dados vencidos ou indisponíveis'),
+            findsOneWidget,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   testWidgets('toque no mapa seleciona e consulta coordenadas reais do toque', (
     tester,
   ) async {

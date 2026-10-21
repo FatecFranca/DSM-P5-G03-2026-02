@@ -43,6 +43,8 @@ class WeatherData(BaseModel):
     """Dados climaticos obtidos da API Open-Meteo."""
 
     temperatura_c: float = Field(..., description="Temperatura do ar em graus Celsius.")
+    latitude_fonte: float | None = None
+    longitude_fonte: float | None = None
     umidade_relativa: float = Field(
         ..., ge=0.0, le=100.0, description="Umidade relativa do ar em porcentagem."
     )

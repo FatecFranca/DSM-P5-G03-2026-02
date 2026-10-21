@@ -7,16 +7,35 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.db import db
+from app.models.regional import RegionalRequest, RegionalResponse
 from app.models.schemas import LocationRequest, RiskResponse
 from app.services.prediction_service import (
     ModelNotAvailableError,
     prediction_service,
+)
+from app.services.regional_service import (
+    OutsideCoverageError,
+    RegionalBusyError,
+    regional_service,
 )
 from app.services.weather_service import WeatherServiceError, weather_service
 
 logger = logging.getLogger(__name__)
 
 risk_router = APIRouter(prefix="/api/v1", tags=["risco"])
+
+
+@risk_router.post("/risco-regional", response_model=RegionalResponse,
+                  summary="Amostra até nove zonas de risco no Brasil")
+async def risco_regional(localizacao: RegionalRequest) -> RegionalResponse:
+    try:
+        return await regional_service.analyze(localizacao.latitude, localizacao.longitude)
+    except OutsideCoverageError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RegionalBusyError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except ModelNotAvailableError as exc:
+        raise HTTPException(status_code=503, detail="Modelo de previsão indisponível.") from exc
 
 
 async def get_db():

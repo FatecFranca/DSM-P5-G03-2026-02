@@ -15,6 +15,7 @@ pydantic-settings==2.15.0
 
 # --- HTTP client (Open-Meteo) ---
 httpx==0.28.1
+shapely==2.2.0
 
 # --- Machine Learning ---
 scikit-learn==1.8.0

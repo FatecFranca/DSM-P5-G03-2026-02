@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import math
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 import httpx
 
@@ -46,9 +46,9 @@ LIMIAR_CHUVA_MM = 1.0
 
 #: Limites fisicos usados para sanity check antes de devolver ao modelo.
 LIMITE_TEMPERATURA_C = (-70.0, 65.0)
-LIMITE_UMIDADE = (-1.0, 101.0)
-LIMITE_PRECIPITACAO = (-0.5, 400.0)
-LIMITE_VENTO_KMH = (-1.0, 250.0)
+LIMITE_UMIDADE = (0.0, 100.0)
+LIMITE_PRECIPITACAO = (0.0, 400.0)
+LIMITE_VENTO_KMH = (0.0, 250.0)
 
 
 class WeatherServiceError(RuntimeError):
@@ -62,6 +62,7 @@ class WeatherService:
         timeout: float | None = None,
         cache_ttl: float | None = None,
         permitir_fallback: bool | None = None,
+        permitir_ajustes: bool = True,
     ) -> None:
         self.timeout = timeout if timeout is not None else settings.OPEN_METEO_TIMEOUT
         self.cache_ttl = cache_ttl if cache_ttl is not None else settings.CACHE_TTL_SEGUNDOS
@@ -69,6 +70,7 @@ class WeatherService:
             permitir_fallback if permitir_fallback is not None else settings.PERMITIR_FALLBACK_CLIMA
         )
         self._cache: dict[tuple[float, float], tuple[float, WeatherData]] = {}
+        self.permitir_ajustes = permitir_ajustes
 
     # ------------------------------------------------------------------ cache
 
@@ -84,6 +86,9 @@ class WeatherService:
 
     def _cache_set(self, chave: tuple[float, float], dados: WeatherData) -> None:
         self._cache[chave] = (time.monotonic(), dados)
+        # Consultas regionais podem visitar muitas células diferentes.
+        while len(self._cache) > 256:
+            self._cache.pop(next(iter(self._cache)))
 
     def limpar_cache(self) -> None:
         self._cache.clear()
@@ -175,46 +180,55 @@ class WeatherService:
         vento_max = _ultimo_numero(diario.get("wind_speed_10m_max"))
         dias_sem_chuva = _dias_sem_chuva(diario.get("precipitation_sum"))
 
-        dados = WeatherData(
-            temperatura_c=_obrigatorio(current, "temperature_2m"),
-            umidade_relativa=_obrigatorio(current, "relative_humidity_2m"),
-            precipitacao_mm=_obrigatorio(current, "precipitation"),
-            velocidade_vento_kmh=_obrigatorio(current, "wind_speed_10m"),
-            rajada_vento_kmh=_numero(current.get("wind_gusts_10m")),
-            sensacao_termica_c=_numero(current.get("apparent_temperature")),
-            ponto_de_orvalho_c=_numero(current.get("dew_point_2m")),
-            indice_uv=uv_max,
-            cobertura_nuvens=_numero(current.get("cloud_cover")),
-            temperatura_max_c=temp_max,
-            temperatura_min_c=temp_min,
-            precipitacao_diaria_mm=precip_diaria,
-            vento_max_kmh=vento_max,
-            dias_sem_chuva=dias_sem_chuva,
-            horario=_parse_hora(current.get("time")),
-        )
-        self._sanitizar(dados)
-        return dados
+        valores = {
+            "latitude_fonte": _numero(payload.get("latitude")),
+            "longitude_fonte": _numero(payload.get("longitude")),
+            "temperatura_c": _obrigatorio(current, "temperature_2m"),
+            "umidade_relativa": _obrigatorio(current, "relative_humidity_2m"),
+            "precipitacao_mm": _obrigatorio(current, "precipitation"),
+            "velocidade_vento_kmh": _obrigatorio(current, "wind_speed_10m"),
+            "rajada_vento_kmh": _numero(current.get("wind_gusts_10m")),
+            "sensacao_termica_c": _numero(current.get("apparent_temperature")),
+            "ponto_de_orvalho_c": _numero(current.get("dew_point_2m")),
+            "indice_uv": uv_max,
+            "cobertura_nuvens": _numero(current.get("cloud_cover")),
+            "temperatura_max_c": temp_max,
+            "temperatura_min_c": temp_min,
+            "precipitacao_diaria_mm": precip_diaria,
+            "vento_max_kmh": vento_max,
+            "dias_sem_chuva": dias_sem_chuva,
+            "horario": _parse_hora(current.get("time"), payload.get("utc_offset_seconds")),
+        }
+        self._sanitizar(valores)
+        return WeatherData(**valores)
 
-    def _sanitizar(self, dados: WeatherData) -> None:
-        def _recorta(v: float | None, faixa: tuple[float, float]) -> float | None:
-            if v is None:
-                return v
-            inf, sup = faixa
-            return max(inf, min(sup, v))
-
-        dados.temperatura_c = _recorta(dados.temperatura_c, LIMITE_TEMPERATURA_C)  # type: ignore[assignment]
-        dados.umidade_relativa = _recorta(dados.umidade_relativa, LIMITE_UMIDADE)  # type: ignore[assignment]
-        dados.precipitacao_mm = _recorta(dados.precipitacao_mm, LIMITE_PRECIPITACAO)  # type: ignore[assignment]
-        dados.velocidade_vento_kmh = _recorta(dados.velocidade_vento_kmh, LIMITE_VENTO_KMH)  # type: ignore[assignment]
-        dados.rajada_vento_kmh = _recorta(dados.rajada_vento_kmh, LIMITE_VENTO_KMH)
-        dados.sensacao_termica_c = _recorta(dados.sensacao_termica_c, LIMITE_TEMPERATURA_C)
-        dados.ponto_de_orvalho_c = _recorta(dados.ponto_de_orvalho_c, LIMITE_TEMPERATURA_C)
-        dados.cobertura_nuvens = _recorta(dados.cobertura_nuvens, (-0.5, 101.0))
-        dados.temperatura_max_c = _recorta(dados.temperatura_max_c, LIMITE_TEMPERATURA_C)
-        dados.temperatura_min_c = _recorta(dados.temperatura_min_c, LIMITE_TEMPERATURA_C)
-        dados.precipitacao_diaria_mm = _recorta(dados.precipitacao_diaria_mm, LIMITE_PRECIPITACAO)
-        dados.vento_max_kmh = _recorta(dados.vento_max_kmh, LIMITE_VENTO_KMH)
-        dados.dias_sem_chuva = _recorta(dados.dias_sem_chuva, (0.0, 365.0))
+    def _sanitizar(self, valores: dict) -> None:
+        faixas = {
+            "temperatura_c": LIMITE_TEMPERATURA_C,
+            "umidade_relativa": LIMITE_UMIDADE,
+            "precipitacao_mm": LIMITE_PRECIPITACAO,
+            "velocidade_vento_kmh": LIMITE_VENTO_KMH,
+            "rajada_vento_kmh": LIMITE_VENTO_KMH,
+            "sensacao_termica_c": LIMITE_TEMPERATURA_C,
+            "ponto_de_orvalho_c": LIMITE_TEMPERATURA_C,
+            "cobertura_nuvens": LIMITE_UMIDADE,
+            "temperatura_max_c": LIMITE_TEMPERATURA_C,
+            "temperatura_min_c": LIMITE_TEMPERATURA_C,
+            "precipitacao_diaria_mm": LIMITE_PRECIPITACAO,
+            "vento_max_kmh": LIMITE_VENTO_KMH,
+            "dias_sem_chuva": (0.0, 365.0),
+            "indice_uv": (0.0, float("inf")),
+        }
+        for campo, (inferior, superior) in faixas.items():
+            valor = valores[campo]
+            if valor is None:
+                continue
+            ajustado = max(inferior, min(superior, valor))
+            if ajustado != valor:
+                if not self.permitir_ajustes:
+                    raise WeatherServiceError(f"Campo fora da faixa física: {campo}")
+                logger.warning("Campo climático recortado à faixa física: %s", campo)
+            valores[campo] = ajustado
 
     def estimar_clima(
         self,
@@ -269,7 +283,8 @@ def _numero(valor: object) -> float | None:
     if valor is None:
         return None
     try:
-        return float(valor)  # type: ignore[arg-type]
+        numero = float(valor)  # type: ignore[arg-type]
+        return numero if math.isfinite(numero) else None
     except (TypeError, ValueError):
         return None
 
@@ -294,17 +309,24 @@ def _dias_sem_chuva(serie: object) -> float | None:
     dias = 0
     for valor in reversed(serie):
         numero = _numero(valor)
-        if numero is None or numero >= LIMIAR_CHUVA_MM:
+        if numero is None or numero < 0:
+            return None
+        if numero >= LIMIAR_CHUVA_MM:
             break
         dias += 1
     return float(dias)
 
 
-def _parse_hora(valor: object) -> datetime | None:
+def _parse_hora(valor: object, offset_segundos: object = None) -> datetime | None:
     if not isinstance(valor, str):
         return None
     try:
-        return datetime.fromisoformat(valor)
+        hora = datetime.fromisoformat(valor)
+        if hora.tzinfo is None:
+            if not isinstance(offset_segundos, (int, float)) or not math.isfinite(offset_segundos):
+                return None
+            hora = hora.replace(tzinfo=timezone(timedelta(seconds=offset_segundos)))
+        return hora.astimezone(UTC)
     except ValueError:
         return None
 

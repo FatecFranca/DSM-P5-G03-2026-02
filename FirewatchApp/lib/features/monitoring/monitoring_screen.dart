@@ -6,12 +6,15 @@ import 'package:latlong2/latlong.dart';
 
 import '../../core/models/geo_coordinates.dart';
 import '../../core/models/risk_prediction.dart';
+import '../../core/models/regional_risk.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../services/api_service.dart';
 import '../../shared/widgets/risk_result_sheet.dart';
 import '../../shared/widgets/weather_metric_card.dart';
+import 'regional_risk_controller.dart';
+import 'regional_risk_panel.dart';
 
 final mapTileProviderProvider = Provider<TileProvider>(
   (ref) => NetworkTileProvider(),
@@ -32,6 +35,83 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
   bool _locating = false;
   String? _error;
   int _requestVersion = 0;
+  String? _selectedZone;
+
+  void _showZone(RiskZone zone) {
+    final regionalState = ref.read(regionalRiskProvider);
+    if (regionalState.expired || !zone.isFresh(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            zone.prediction == null
+                ? 'Sem dados para esta zona. Analise a região novamente para tentar outra consulta.'
+                : 'Dados vencidos. Analise a região novamente para atualizar.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _selectedZone = zone.id);
+    final index = regionalState.region!.zones.indexOf(zone) + 1;
+    String time(DateTime date) => date.toLocal().toString().substring(0, 16);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => Consumer(
+        builder: (context, ref, child) {
+          final current = ref.watch(regionalRiskProvider);
+          if (current.expired ||
+              !identical(current.region, regionalState.region) ||
+              !zone.isFresh(DateTime.now())) {
+            return const SafeArea(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Dados vencidos ou indisponíveis. Analise a região novamente para atualizar.',
+                ),
+              ),
+            );
+          }
+          return RiskResultSheet(
+            prediction: zone.prediction!,
+            locationName: 'Zona $index · Risco regional',
+            contextNote:
+                'Amostra: ${zone.sample.latitude.toStringAsFixed(4)}, ${zone.sample.longitude.toStringAsFixed(4)}. '
+                'Consultada em ${time(zone.queriedAt!)}. Válida até ${time(zone.expiresAt!)}. '
+                '${zone.weatherTime == null ? 'Horário meteorológico não informado.' : 'Referência meteorológica: ${time(zone.weatherTime!)}.'} '
+                'Estimativa regional a partir de um ponto; não é um perímetro de incêndio.',
+          );
+        },
+      ),
+    );
+  }
+
+  void _mapTap(LatLng location) {
+    final region = ref.read(regionalRiskProvider).region;
+    if (region != null) {
+      for (final zone in region.zones) {
+        if (zone.contains(location)) {
+          _showZone(zone);
+          return;
+        }
+      }
+    }
+    _select(
+      GeoCoordinates(
+        latitude: location.latitude,
+        longitude: location.longitude,
+      ),
+    );
+  }
+
+  Future<void> _analyzeRegion() async {
+    if (!_mapReady) return;
+    setState(() => _selectedZone = null);
+    await ref
+        .read(regionalRiskProvider.notifier)
+        .analyze(_mapController.camera.center);
+  }
 
   bool _same(GeoCoordinates? a, GeoCoordinates? b) =>
       a?.latitude == b?.latitude && a?.longitude == b?.longitude;
@@ -150,6 +230,21 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<RegionalRiskState>(regionalRiskProvider, (previous, next) {
+      final region = next.region;
+      if (region != null && !identical(previous?.region, region) && _mapReady) {
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds(
+              LatLng(region.bbox[1], region.bbox[0]),
+              LatLng(region.bbox[3], region.bbox[2]),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 110, 24, 90),
+            maxZoom: 11,
+          ),
+        );
+      }
+    });
     ref.listen<GeoCoordinates?>(coordinatesProvider, (previous, next) {
       if (identical(previous, next)) return;
       ++_requestVersion;
@@ -172,6 +267,8 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
     final name = ref.watch(locationProvider);
     final queryTime = ref.watch(riskQueryTimeProvider);
     final scheme = Theme.of(context).colorScheme;
+    final regionalState = ref.watch(regionalRiskProvider);
+    final region = regionalState.region;
     final center = point == null
         ? _defaultCenter
         : LatLng(point.latitude, point.longitude);
@@ -193,12 +290,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                         flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                       ),
                       onMapReady: () => _mapReady = true,
-                      onTap: (_, location) => _select(
-                        GeoCoordinates(
-                          latitude: location.latitude,
-                          longitude: location.longitude,
-                        ),
-                      ),
+                      onTap: (_, location) => _mapTap(location),
                     ),
                     children: [
                       TileLayer(
@@ -207,6 +299,34 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                         userAgentPackageName: 'com.example.firewatch',
                         tileProvider: ref.watch(mapTileProviderProvider),
                       ),
+                      if (region != null)
+                        PolygonLayer(
+                          polygons: [
+                            for (final zone in region.zones)
+                              for (final rings in zone.polygons)
+                                Polygon(
+                                  points: rings.first,
+                                  holePointsList: rings.skip(1).toList(),
+                                  color:
+                                      (regionalState.expired
+                                              ? scheme.outline
+                                              : zone.prediction?.level.color ??
+                                                    scheme.outline)
+                                          .withValues(alpha: 0.28),
+                                  borderColor: zone.id == _selectedZone
+                                      ? scheme.onSurface
+                                      : scheme.outline,
+                                  borderStrokeWidth: zone.id == _selectedZone
+                                      ? 3
+                                      : 1,
+                                  pattern:
+                                      zone.prediction == null ||
+                                          regionalState.expired
+                                      ? StrokePattern.dashed(segments: [4, 4])
+                                      : const StrokePattern.solid(),
+                                ),
+                          ],
+                        ),
                       if (point != null)
                         MarkerLayer(
                           markers: [
@@ -290,6 +410,25 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                     ),
                   ),
                   Positioned(
+                    left: 16,
+                    right: 80,
+                    bottom: 32,
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: FilledButton.tonalIcon(
+                        onPressed: regionalState.loading
+                            ? null
+                            : _analyzeRegion,
+                        icon: const Icon(Icons.layers_outlined),
+                        label: Text(
+                          regionalState.loading
+                              ? 'Analisando região…'
+                              : 'Analisar esta região',
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
                     right: 16,
                     bottom: 32,
                     child: Material(
@@ -328,6 +467,13 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (regionalState.loading ||
+                          regionalState.error != null ||
+                          region != null)
+                        RegionalRiskPanel(
+                          state: regionalState,
+                          onZone: _showZone,
+                        ),
                       Row(
                         children: [
                           Expanded(
@@ -454,7 +600,9 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                       ],
                       const SizedBox(height: 8),
                       Text(
-                        'Consulta pontual. Toque no mapa para escolher outro local.',
+                        region == null
+                            ? 'Consulta pontual. Toque no mapa para escolher outro local.'
+                            : 'Toque em uma zona para ver sua amostra. Para consultar outro local, use a busca ou toque fora das zonas.',
                         style: TextStyle(
                           fontSize: 12,
                           color: scheme.onSurfaceVariant,

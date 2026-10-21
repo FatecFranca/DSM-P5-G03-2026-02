@@ -33,12 +33,20 @@ class ApiService {
     http.Client? client,
     String baseUrl = EnvConfig.apiBaseUrl,
     Duration timeout = _defaultTimeout,
+    String? regionalBaseUrl,
   }) : _client = client ?? http.Client(),
        _baseUri = Uri.parse(baseUrl),
+       _regionalBaseUri = Uri.parse(
+         regionalBaseUrl ??
+             (baseUrl == EnvConfig.apiBaseUrl
+                 ? EnvConfig.regionalApiBaseUrl
+                 : baseUrl),
+       ),
        _timeout = timeout;
 
   final http.Client _client;
   final Uri _baseUri;
+  final Uri _regionalBaseUri;
 
   /// Tempo máximo de espera por resposta da API.
   final Duration _timeout;
@@ -46,6 +54,20 @@ class ApiService {
   static const Duration _defaultTimeout = Duration(seconds: 20);
 
   void close() => _client.close();
+
+  /// Uma requisição regional, com quantidade de células controlada pelo servidor.
+  Future<Map<String, dynamic>> preverRegiao(double latitude, double longitude) {
+    final uri = _regionalBaseUri.resolve('/api/v1/risco-regional');
+    return _send(
+      () => _client.post(
+        uri,
+        body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+        headers: {'Content-Type': 'application/json'},
+      ),
+      uri,
+      timeout: const Duration(seconds: 75),
+    );
+  }
 
   /// Verifica a saúde do serviço e do modelo de previsão.
   Future<Map<String, dynamic>> health() {
@@ -60,10 +82,7 @@ class ApiService {
   }
 
   /// Prediz o risco de incêndio para as coordenadas informadas.
-  Future<Map<String, dynamic>> preverRisco(
-    double latitude,
-    double longitude,
-  ) {
+  Future<Map<String, dynamic>> preverRisco(double latitude, double longitude) {
     final uri = _baseUri.resolve('/api/v1/prever-risco');
     return _send(
       () => _client.post(
@@ -79,11 +98,12 @@ class ApiService {
   /// [ApiException] com mensagem amigável.
   Future<Map<String, dynamic>> _send(
     Future<http.Response> Function() request,
-    Uri uri,
-  ) async {
+    Uri uri, {
+    Duration? timeout,
+  }) async {
     final http.Response response;
     try {
-      response = await request().timeout(_timeout);
+      response = await request().timeout(timeout ?? _timeout);
     } on TimeoutException {
       throw ApiException(
         'Tempo de conexão esgotado. Verifique sua internet e tente novamente.',
@@ -125,6 +145,7 @@ class ApiService {
       400 => 'Requisição inválida.',
       404 => 'Recurso não encontrado na API.',
       422 => 'As coordenadas informadas são inválidas.',
+      429 => 'Muitas regiões em análise. Aguarde e tente novamente.',
       500 => 'Erro interno no serviço. Tente novamente mais tarde.',
       503 =>
         'Serviço de previsão indisponível no momento. Tente novamente mais tarde.',

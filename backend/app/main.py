@@ -9,7 +9,9 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.config import settings
@@ -144,6 +146,17 @@ app.add_middleware(
 )
 
 app.include_router(risk_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def entrada_invalida(_request, exc: RequestValidationError) -> JSONResponse:
+    # O JSON recebido pode conter NaN/Infinity. Não ecoar o campo input evita
+    # falha de serialização e mantém o contrato 422 sem devolver dados enviados.
+    erros = [
+        {chave: erro[chave] for chave in ("loc", "msg", "type")}
+        for erro in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": erros})
 
 
 @app.get("/", tags=["geral"], summary="Informacoes da API")

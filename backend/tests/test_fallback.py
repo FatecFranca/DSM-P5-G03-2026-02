@@ -13,10 +13,26 @@ if str(RAIZ) not in sys.path:
 
 from app.main import app  # noqa: E402
 from app.services import weather_service as ws_module  # noqa: E402
+from app.services.prediction_service import prediction_service  # noqa: E402
 
 
 @pytest.fixture
-def cliente() -> TestClient:
+def cliente(monkeypatch) -> TestClient:
+    # Estes testes exercitam HTTP/clima; a inferência real tem testes próprios.
+    def prever(clima, latitude, longitude, local=None):
+        return {
+            "localizacao": {"latitude": latitude, "longitude": longitude},
+            "dados_climaticos": {
+                "temperatura": clima.temperatura_c, "umidade_ar": clima.umidade_relativa,
+                "precipitacao_mm": clima.precipitacao_mm, "vento_kmh": clima.velocidade_vento_kmh,
+            },
+            "predicao": {
+                "probabilidade": 0.1, "porcentagem": "10%", "nivel_risco": "BAIXO",
+                "classe": "Risco Baixo", "cor_alerta": "#22C55E", "recomendacao": "Teste de clima.",
+            },
+        }
+
+    monkeypatch.setattr(prediction_service, "prever", prever)
     with TestClient(app) as c:
         yield c
 
