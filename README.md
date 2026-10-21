@@ -68,7 +68,7 @@ flowchart LR
     E --> F[modelo.pkl - Random Forest]
     F --> G[Classe + probabilidades + recomendação]
     G --> A
-    C -.->|Treinamento / health / db-test| H[(PostgreSQL)]
+    C -.->|Treinamento / health| H[(PostgreSQL)]
     A -->|Nome da cidade| I[Nominatim]
     A -->|Mapa| J[Tiles OpenStreetMap]
 ```
@@ -349,7 +349,9 @@ As configurações são carregadas de `backend/.env` por `pydantic-settings` e
 | `OPEN_METEO_TIMEOUT` | `10` | Timeout das requisições, em segundos |
 | `CACHE_TTL_SEGUNDOS` | `300` | Tempo de cache do clima por coordenada |
 | `PERMITIR_FALLBACK_CLIMA` | `false` | Usa estimativa offline quando a Open-Meteo falha |
-| `CORS_ORIGINS` | `*` | Origens permitidas, separadas por vírgula |
+| `CORS_ORIGINS` | vazio | Origens web explícitas, separadas por vírgula; sem curingas |
+| `RISK_RATE_PER_MINUTE` | `60` | Consultas pontuais por IP/minuto em cada processo |
+| `REGIONAL_RATE_PER_MINUTE` | `6` | Consultas regionais por IP/minuto em cada processo |
 | `DB_HOST` | `localhost` | Host do PostgreSQL |
 | `DB_PORT` | `5432` | Porta do PostgreSQL |
 | `DB_NAME` | `firewatch_db` | Nome do banco |
@@ -370,7 +372,7 @@ As configurações são carregadas de `backend/.env` por `pydantic-settings` e
 | `GET` | `/` | Informações gerais da API |
 | `GET` | `/health` | Estado do serviço, do modelo e do banco |
 | `POST` | `/api/v1/prever-risco` | Predição de risco para uma coordenada |
-| `GET` | `/api/v1/db-test` | Teste de conexão com o PostgreSQL |
+| `POST` | `/api/v1/risco-regional` | Até nove zonas de risco com recorte territorial e cache |
 | `GET` | `/docs` | Documentação Swagger UI |
 | `GET` | `/redoc` | Documentação ReDoc |
 | `GET` | `/openapi.json` | Especificação OpenAPI |

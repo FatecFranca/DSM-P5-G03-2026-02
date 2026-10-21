@@ -26,7 +26,6 @@ class ApiException extends http.ClientException {
 /// Endpoints disponíveis (conforme o Swagger da API):
 /// - `GET /health`
 /// - `GET /`
-/// - `GET /api/v1/db-test`
 /// - `POST /api/v1/prever-risco`
 class ApiService {
   ApiService({
@@ -72,12 +71,6 @@ class ApiService {
   /// Verifica a saúde do serviço e do modelo de previsão.
   Future<Map<String, dynamic>> health() {
     final uri = _baseUri.resolve('/health');
-    return _send(() => _client.get(uri), uri);
-  }
-
-  /// Testa a conexão da API com o banco de dados.
-  Future<Map<String, dynamic>> dbTest() {
-    final uri = _baseUri.resolve('/api/v1/db-test');
     return _send(() => _client.get(uri), uri);
   }
 

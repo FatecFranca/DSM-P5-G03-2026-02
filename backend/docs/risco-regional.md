@@ -84,3 +84,26 @@ Testes regionais cobrem fronteiras, oceanos/países vizinhos, concorrência,
 deduplicação, limites, expiração, versão do modelo e falhas parciais. O Flutter
 verifica contrato, seleção, layout reduzido, vencimento e respostas antigas.
 Fixtures são restritas aos testes; a aplicação não as utiliza como fallback.
+
+## Proteções e publicação
+
+- `/api/v1/db-test` foi removido; `/health` continua disponível.
+- CORS vem bloqueado por padrão. Configure `CORS_ORIGINS` somente com as origens
+  web necessárias. `*` não é aceito. O aplicativo Android não depende de CORS.
+- Limites padrão por IP/minuto: 60 consultas pontuais e 6 regionais. Ajustar com
+  `RISK_RATE_PER_MINUTE` e `REGIONAL_RATE_PER_MINUTE`. Excesso retorna 429 e
+  `Retry-After`; preflight não consome a cota.
+- O limite é por processo e não substitui autenticação. Em múltiplos workers,
+  aplicar limite compartilhado no proxy. Configure o servidor para confiar em
+  cabeçalhos de IP encaminhado somente quando vierem do proxy controlado.
+- Preserve `.env` e `ml/modelo.pkl` da VM, que não pertencem ao Git. Não treine
+  nem troque o modelo só para publicar esta rota. Faça backup antes da atualização.
+- Instale as dependências em ambiente compatível com o modelo, confirme que
+  `app/data/brasil.geojson` foi publicado e reinicie o serviço pelo mecanismo já
+  usado na VM. Se o modelo não carregar, não considere o deploy concluído.
+- Depois da publicação, validar `/health`, a rota pontual e a regional com clima
+  real. Entradas `NaN`/`Infinity` devem retornar 422 em ambas as rotas.
+
+O workflow de validação executa `flutter analyze`, `flutter test` e `pytest` em
+checkout limpo. Os testes de inferência com artefato real são pulados quando ele
+não está presente; a regressão com o modelo da VM continua sendo necessária.

@@ -17,6 +17,7 @@ from app import __version__
 from app.config import settings
 from app.db import db, get_db_config
 from app.models.schemas import HealthResponse
+from app.rate_limit import RiskRateLimitMiddleware
 from app.routes.risk import risk_router
 from app.services.classificacao import CLASSES
 from app.services.prediction_service import ModelNotAvailableError, prediction_service
@@ -137,6 +138,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.add_middleware(
+    RiskRateLimitMiddleware,
+    limits={
+        "/api/v1/prever-risco": settings.RISK_RATE_PER_MINUTE,
+        "/api/v1/risco-regional": settings.REGIONAL_RATE_PER_MINUTE,
+    },
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,

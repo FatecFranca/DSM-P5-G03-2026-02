@@ -22,21 +22,6 @@ void main() {
       expect(await service.health(), {'status': 'ok'});
     });
 
-    test('consulta o endpoint de teste do banco', () async {
-      final client = MockClient((request) async {
-        expect(request.method, 'GET');
-        expect(request.url, Uri.https('api.example.test', '/api/v1/db-test'));
-        return http.Response('{"connected":true}', 200);
-      });
-      final service = ApiService(
-        client: client,
-        baseUrl: 'https://api.example.test/',
-      );
-      addTearDown(service.close);
-
-      expect(await service.dbTest(), {'connected': true});
-    });
-
     test('envia coordenadas e decodifica a previsão', () async {
       final client = MockClient((request) async {
         expect(request.method, 'POST');
@@ -60,25 +45,27 @@ void main() {
       expect(await service.preverRisco(-20.5394, -47.4014), {'nivel': 'baixo'});
     });
 
-    test('lança ApiException com o status para resposta HTTP malsucedida',
-        () async {
-      final service = ApiService(
-        client: MockClient(
-          (_) async => http.Response('{"detail":"Modelo indisponível"}', 503),
-        ),
-        baseUrl: 'https://api.example.test',
-      );
-      addTearDown(service.close);
+    test(
+      'lança ApiException com o status para resposta HTTP malsucedida',
+      () async {
+        final service = ApiService(
+          client: MockClient(
+            (_) async => http.Response('{"detail":"Modelo indisponível"}', 503),
+          ),
+          baseUrl: 'https://api.example.test',
+        );
+        addTearDown(service.close);
 
-      await expectLater(
-        service.dbTest(),
-        throwsA(
-          isA<ApiException>()
-              .having((e) => e.statusCode, 'statusCode', 503)
-              .having((e) => e.message, 'message', 'Modelo indisponível'),
-        ),
-      );
-    });
+        await expectLater(
+          service.health(),
+          throwsA(
+            isA<ApiException>()
+                .having((e) => e.statusCode, 'statusCode', 503)
+                .having((e) => e.message, 'message', 'Modelo indisponível'),
+          ),
+        );
+      },
+    );
 
     test('traduz 422 com lista de validação em mensagem amigável', () async {
       final service = ApiService(
@@ -139,7 +126,7 @@ void main() {
       );
       addTearDown(service.close);
 
-      expect(service.dbTest(), throwsFormatException);
+      expect(service.health(), throwsFormatException);
     });
   });
 }
