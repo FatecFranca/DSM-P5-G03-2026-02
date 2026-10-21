@@ -10,20 +10,23 @@ import '../../features/risk_details/risk_details_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/shell/app_shell.dart';
 import '../../features/splash/splash_screen.dart';
+import '../../services/intro_preferences.dart';
 
 /// Roteador do aplicativo usando GoRouter.
 abstract final class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-  static GoRouter create() {
+  static GoRouter create({required IntroPreferences intro}) {
     return GoRouter(
       navigatorKey: _rootNavigatorKey,
-      initialLocation: '/splash',
+      initialLocation: intro.completed ? '/' : '/splash',
+      overridePlatformDefaultLocation: true,
       routes: [
         // Tela de abertura.
         GoRoute(
           path: '/splash',
-          builder: (context, state) => const SplashScreen(),
+          redirect: (_, _) => intro.completed ? '/' : null,
+          builder: (context, state) => SplashScreen(onEnter: intro.complete),
         ),
 
         // Onboarding de localização.

@@ -35,13 +35,13 @@ class LocationService {
 
     if (permission == LocationPermission.denied) {
       throw const LocationException(
-        'Permissão de localização negada. Digite as coordenadas manualmente.',
+        'Permissão de localização negada. Você pode buscar uma cidade ou escolher um ponto no mapa.',
       );
     }
 
     if (permission == LocationPermission.deniedForever) {
       throw const LocationException(
-        'Permissão de localização bloqueada. Habilite nas configurações do aparelho.',
+        'Permissão de localização bloqueada. Busque uma cidade ou habilite o GPS nas configurações do aparelho.',
       );
     }
 

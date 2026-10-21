@@ -27,7 +27,7 @@ class GeocodingService {
 
   final http.Client _client;
 
-  static const String _userAgent = 'FireWatch/1.0 (projeto integrador)';
+  static const String _userAgent = 'FireWatch/1.0 (projeto interdisciplinar)';
   static const Duration _timeout = Duration(seconds: 8);
 
   static final Map<String, String> _cache = {};

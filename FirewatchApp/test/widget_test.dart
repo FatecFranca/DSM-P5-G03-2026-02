@@ -9,12 +9,15 @@ import 'package:firewatch/core/providers/app_providers.dart';
 import 'package:firewatch/features/monitoring/monitoring_screen.dart';
 import 'package:firewatch/services/api_service.dart';
 import 'package:firewatch/services/geocoding_service.dart';
+import 'package:firewatch/services/intro_preferences.dart';
+import 'package:firewatch/services/location_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tile transparente de 1x1 usado para não acessar a rede nos testes.
 final Uint8List _transparentTile = base64Decode(
@@ -25,6 +28,18 @@ class _FakeTileProvider extends TileProvider {
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
       MemoryImage(_transparentTile);
+}
+
+class _DeniedLocationService extends LocationService {
+  int calls = 0;
+
+  @override
+  Future<GeoCoordinates> getCurrentLocation() async {
+    calls++;
+    throw const LocationException(
+      'Permissão de localização negada. Você pode buscar uma cidade.',
+    );
+  }
 }
 
 const String _riskResponseJson = '''
@@ -74,8 +89,19 @@ MockClient _apiMockClient() {
 
 MockClient _geocodingMockClient() {
   return MockClient(
-    (_) async => http.Response(
-      _geocodingResponseJson,
+    (request) async => http.Response(
+      request.url.host == 'geocoding-api.open-meteo.com'
+          ? jsonEncode({
+              'results': [
+                {
+                  'name': 'Franca',
+                  'admin1': 'São Paulo',
+                  'latitude': -20.5386,
+                  'longitude': -47.4008,
+                },
+              ],
+            })
+          : _geocodingResponseJson,
       200,
       headers: {'content-type': 'application/json'},
     ),
@@ -92,11 +118,17 @@ List<Override> _testOverrides() => [
   mapTileProviderProvider.overrideWithValue(_FakeTileProvider()),
 ];
 
-Future<void> _pumpApp(WidgetTester tester, {List<Override>? overrides}) async {
+Future<void> _pumpApp(
+  WidgetTester tester, {
+  List<Override>? overrides,
+  bool resetIntro = true,
+}) async {
+  if (resetIntro) SharedPreferences.setMockInitialValues({});
+  final intro = await IntroPreferences.load();
   await tester.pumpWidget(
     ProviderScope(
       overrides: overrides ?? _testOverrides(),
-      child: FirewatchApp(),
+      child: FirewatchApp(intro: intro),
     ),
   );
   await tester.pump();
@@ -104,7 +136,7 @@ Future<void> _pumpApp(WidgetTester tester, {List<Override>? overrides}) async {
 
 Future<void> _openMap(WidgetTester tester, {List<Override>? overrides}) async {
   await _pumpApp(tester, overrides: overrides);
-  await tester.tap(find.text('Começar'));
+  await tester.tap(find.text('Entrar no app'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Pular'));
   await tester.pumpAndSettle();
@@ -122,18 +154,72 @@ Future<void> _enterPoint(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('entrada persiste e uma nova instância abre diretamente o mapa', (
+    tester,
+  ) async {
+    await _pumpApp(tester);
+    expect(find.text('PROJETO INTERDISCIPLINAR • 5º SEMESTRE'), findsOneWidget);
+    expect(find.text('PROJETO INTEGRADOR • 5º SEMESTRE'), findsNothing);
+    await tester.tap(find.text('Entrar no app'));
+    await tester.pumpAndSettle();
+    expect((await IntroPreferences.load()).completed, isTrue);
+    await tester.tap(find.text('Pular'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    tester.platformDispatcher.defaultRouteNameTestValue = '/splash';
+    addTearDown(tester.platformDispatcher.clearDefaultRouteNameTestValue);
+    await _pumpApp(tester, resetIntro: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(FlutterMap), findsOneWidget);
+    expect(find.text('Entrar no app'), findsNothing);
+    expect(find.text('Onde você está?'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('GPS negado mantém busca e não impede a entrada persistida', (
+    tester,
+  ) async {
+    final location = _DeniedLocationService();
+    final overrides = [
+      ..._testOverrides(),
+      locationServiceProvider.overrideWithValue(location),
+    ];
+    await _pumpApp(tester, overrides: overrides);
+    expect(location.calls, 0);
+    await tester.tap(find.text('Entrar no app'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Permitir localização'));
+    await tester.pumpAndSettle();
+    expect(location.calls, 1);
+    expect(
+      find.textContaining('Permissão de localização negada'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('Buscar localização'));
+    await tester.tap(find.text('Buscar localização'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'Franca');
+    await tester.tap(find.text('Buscar cidade'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Franca, São Paulo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FlutterMap), findsOneWidget);
+    expect(find.text('Franca, SP'), findsOneWidget);
+    expect((await IntroPreferences.load()).completed, isTrue);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('splash aguarda o toque e mantém as opções de localização', (
     tester,
   ) async {
     await _pumpApp(tester);
     expect(find.byType(FirewatchWordmarkText), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
-    expect(find.text('Começar'), findsOneWidget);
-    await tester.tap(find.text('Começar'));
+    expect(find.text('Entrar no app'), findsOneWidget);
+    await tester.tap(find.text('Entrar no app'));
     await tester.pumpAndSettle();
     expect(find.text('Onde você está?'), findsOneWidget);
     expect(find.text('Permitir localização'), findsOneWidget);
-    expect(find.text('Digitar coordenadas'), findsOneWidget);
+    expect(find.text('Buscar localização'), findsOneWidget);
   });
 
   testWidgets('pular abre mapa real sem inventar localização ou risco', (

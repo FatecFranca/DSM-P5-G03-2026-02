@@ -8,8 +8,38 @@ import '../../core/theme/app_typography.dart';
 import '../../shared/widgets/flame_logo.dart';
 
 /// Abertura com a assinatura e o símbolo de destaque do brand board.
-class SplashScreen extends StatelessWidget {
-  const SplashScreen({super.key});
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key, required this.onEnter});
+  final Future<void> Function() onEnter;
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  bool _saving = false;
+  String? _error;
+
+  Future<void> _enter() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.onEnter();
+      if (mounted) context.go('/onboarding/location');
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Não foi possível salvar sua preferência. Tente novamente.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -62,10 +92,26 @@ class SplashScreen extends StatelessWidget {
                           width: double.infinity,
                           height: 56,
                           child: FilledButton(
-                            onPressed: () => context.go('/onboarding/location'),
-                            child: const Text(AppConstants.splashStartLabel),
+                            onPressed: _saving ? null : _enter,
+                            child: _saving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(AppConstants.splashStartLabel),
                           ),
                         ),
+                        if (_error != null) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: AppColors.grayLight),
+                          ),
+                        ],
                         const SizedBox(height: AppSpacing.xl),
                         Text(
                           AppConstants.splashProjectLabel,

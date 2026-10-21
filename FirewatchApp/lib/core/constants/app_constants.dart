@@ -12,8 +12,9 @@ abstract final class AppConstants {
 
   // Splash
   static const String splashPhrase = 'Veja o risco antes do fogo.';
-  static const String splashStartLabel = 'Começar';
-  static const String splashProjectLabel = 'PROJETO INTEGRADOR • 5º SEMESTRE';
+  static const String splashStartLabel = 'Entrar no app';
+  static const String splashProjectLabel =
+      'PROJETO INTERDISCIPLINAR • 5º SEMESTRE';
 
   // Monitoramento
   static const String conditionsNowLabel = 'CONDIÇÕES AGORA';

@@ -11,7 +11,7 @@ import '../../services/location_service.dart';
 /// Onboarding de localização.
 ///
 /// Explica por que o Firewatch precisa das coordenadas e oferece duas saídas:
-/// solicitar a localização do aparelho ou digitar as coordenadas manualmente.
+/// solicitar a localização do aparelho ou buscar um local sem permissão de GPS.
 class LocationOnboardingScreen extends ConsumerStatefulWidget {
   const LocationOnboardingScreen({super.key});
 
@@ -23,16 +23,20 @@ class LocationOnboardingScreen extends ConsumerStatefulWidget {
 class _LocationOnboardingScreenState
     extends ConsumerState<LocationOnboardingScreen> {
   bool _requesting = false;
+  String? _locationError;
 
   Future<void> _requestLocation() async {
     if (_requesting) return;
-    setState(() => _requesting = true);
+    setState(() {
+      _requesting = true;
+      _locationError = null;
+    });
     try {
       final coordinates = await ref
           .read(locationServiceProvider)
           .getCurrentLocation();
-      ref.read(coordinatesProvider.notifier).state = coordinates;
       if (!mounted) return;
+      ref.read(coordinatesProvider.notifier).state = coordinates;
       context.go('/');
     } on LocationException catch (error) {
       if (!mounted) return;
@@ -46,9 +50,7 @@ class _LocationOnboardingScreenState
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    setState(() => _locationError = message);
   }
 
   void _openManualEntry() {
@@ -123,6 +125,15 @@ class _LocationOnboardingScreenState
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xxl),
+                        if (_locationError != null) ...[
+                          Text(
+                            _locationError!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
                         FilledButton(
                           onPressed: _requesting ? null : _requestLocation,
                           child: _requesting
@@ -152,7 +163,7 @@ class _LocationOnboardingScreenState
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          child: const Text('Digitar coordenadas'),
+                          child: const Text('Buscar localização'),
                         ),
                         const SizedBox(height: AppSpacing.lg),
                       ],
