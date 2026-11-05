@@ -167,7 +167,6 @@ https://firewatch-api.chilecentral.cloudapp.azure.com
 | **flutter_map + latlong2** | Mapa interativo |
 | **geolocator** | Localização por GPS |
 | **http** | Consumo da API |
-| **fl_chart** | Gráficos de previsão e evolução do risco |
 | **google_fonts / flutter_svg** | Tipografia e ícones vetoriais |
 
 ### Backend e Machine Learning

@@ -2,10 +2,7 @@
 ///
 /// Usado tanto para a posição obtida do GPS quanto para a entrada manual.
 class GeoCoordinates {
-  const GeoCoordinates({
-    required this.latitude,
-    required this.longitude,
-  });
+  const GeoCoordinates({required this.latitude, required this.longitude});
 
   final double latitude;
   final double longitude;

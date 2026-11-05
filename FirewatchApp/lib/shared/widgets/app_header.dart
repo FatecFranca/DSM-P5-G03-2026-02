@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/constants/app_constants.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import 'flame_logo.dart';
@@ -72,33 +70,6 @@ class AppHeader extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Linha com ícone de localização e o nome da cidade.
-class LocationLabel extends StatelessWidget {
-  const LocationLabel({super.key, this.location = AppConstants.location});
-
-  final String location;
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.location_on_outlined, size: 18, color: AppColors.orange),
-        const SizedBox(width: AppSpacing.xs),
-        Text(
-          location,
-          style: AppTypography.inter(
-            onSurface,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
     );
   }
 }

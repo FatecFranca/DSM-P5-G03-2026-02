@@ -1,7 +1,7 @@
 # Firewatch
 
-Aplicativo Flutter para acompanhamento do risco de queimadas, com telas de
-previsão, mapa, alertas e orientações de prevenção.
+Aplicativo Flutter para acompanhamento do risco de queimadas, com mapa,
+alertas da última consulta e orientações de prevenção.
 
 ## Executar
 
@@ -15,8 +15,7 @@ flutter run
 O endereço base da API está definido em `lib/config/env_config.dart`
 (`https://firewatch-api.chilecentral.cloudapp.azure.com`). As telas de
 onboarding (coordenadas), monitoramento (mapa + condições + previsão de risco)
-e o fluxo de entrada consomem a API real. As demais telas ainda usam dados
-demonstrativos.
+e o fluxo de entrada consomem a API real.
 
 ## Verificações
 

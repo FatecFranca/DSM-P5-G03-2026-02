@@ -1,6 +1,4 @@
-import 'package:flutter/material.dart';
-
-/// Espaçamentos, raios de borda e sombras padronizados.
+/// Espaçamentos e raios de borda padronizados.
 abstract final class AppSpacing {
   static const double xs = 4;
   static const double sm = 8;
@@ -18,24 +16,4 @@ abstract final class AppRadius {
   static const double xl = 20;
   static const double xxl = 28;
   static const double pill = 999;
-}
-
-class AppShadows {
-  const AppShadows._();
-
-  static List<BoxShadow> card(Color color) => [
-    BoxShadow(
-      color: color.withValues(alpha: 0.06),
-      blurRadius: 18,
-      offset: const Offset(0, 6),
-    ),
-  ];
-
-  static List<BoxShadow> soft(Color color) => [
-    BoxShadow(
-      color: color.withValues(alpha: 0.10),
-      blurRadius: 24,
-      offset: const Offset(0, 10),
-    ),
-  ];
 }

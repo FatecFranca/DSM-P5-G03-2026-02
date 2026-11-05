@@ -26,6 +26,16 @@ final Uint8List _transparentTile = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
 );
 
+const _responsiveViewports = [
+  (name: 'telefone compacto', size: Size(320, 568), textScale: 1.0),
+  (name: 'telefone', size: Size(390, 844), textScale: 1.0),
+  (name: 'telefone com fonte ampliada', size: Size(320, 640), textScale: 1.4),
+  (name: 'paisagem compacta', size: Size(568, 320), textScale: 1.0),
+  (name: 'tablet em retrato', size: Size(768, 1024), textScale: 1.0),
+  (name: 'tablet em paisagem', size: Size(1024, 768), textScale: 1.0),
+  (name: 'janela desktop', size: Size(1440, 900), textScale: 1.0),
+];
+
 class _FakeTileProvider extends TileProvider {
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
@@ -459,6 +469,60 @@ void main() {
     expect(find.text('-21.1704, -47.8103'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final viewport in _responsiveViewports) {
+    testWidgets('fluxos principais cabem em ${viewport.name}', (tester) async {
+      tester.view.physicalSize = viewport.size;
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = viewport.textScale;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await _pumpApp(tester);
+      expect(find.text('Entrar no app'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await Scrollable.ensureVisible(
+        tester.element(find.text('Entrar no app')),
+        alignment: 0.8,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Entrar no app'));
+      await tester.pumpAndSettle();
+      expect(find.text('Onde você está?'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Pular'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FlutterMap), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Alertas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nenhuma consulta disponível.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Prevenção'));
+      await tester.pumpAndSettle();
+      expect(find.text('Como se proteger'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byTooltip('Configurações'));
+      await tester.pumpAndSettle();
+      expect(find.text('Configurações'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Sobre os dados'),
+        200,
+        scrollable: find.descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(find.text('Sobre os dados'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('mapa e prevenção cabem com fonte ampliada e tema escuro', (
     tester,
