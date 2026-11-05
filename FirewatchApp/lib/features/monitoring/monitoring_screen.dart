@@ -274,9 +274,13 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
         : LatLng(point.latitude, point.longitude);
     return Scaffold(
       body: LayoutBuilder(
-        builder: (context, constraints) => Column(
+        builder: (context, constraints) => Flex(
+          direction: _isCompactLandscape(constraints)
+              ? Axis.horizontal
+              : Axis.vertical,
           children: [
             Expanded(
+              flex: _isCompactLandscape(constraints) ? 3 : 1,
               child: Stack(
                 children: [
                   FlutterMap(
@@ -453,15 +457,14 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                 ],
               ),
             ),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: constraints.maxHeight * 0.52,
-              ),
+            _MonitoringDetailsLayout(
+              compactLandscape: _isCompactLandscape(constraints),
+              maxHeight: constraints.maxHeight * 0.52,
               child: Material(
                 color: scheme.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
-                ),
+                borderRadius: _isCompactLandscape(constraints)
+                    ? const BorderRadius.horizontal(left: Radius.circular(28))
+                    : const BorderRadius.vertical(top: Radius.circular(28)),
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
                   child: Column(
@@ -616,6 +619,32 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+bool _isCompactLandscape(BoxConstraints constraints) =>
+    constraints.maxHeight < 420 && constraints.maxWidth > constraints.maxHeight;
+
+class _MonitoringDetailsLayout extends StatelessWidget {
+  const _MonitoringDetailsLayout({
+    required this.compactLandscape,
+    required this.maxHeight,
+    required this.child,
+  });
+
+  final bool compactLandscape;
+  final double maxHeight;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (compactLandscape) {
+      return Expanded(flex: 2, child: child);
+    }
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: child,
     );
   }
 }

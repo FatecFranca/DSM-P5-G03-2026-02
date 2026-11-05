@@ -1,0 +1,10 @@
+# Local AI agents and assistant tooling
+.agents/
+.claude/
+.codex/
+.continue/
+.cursor/
+.gemini/
+.windsurf/
+.aider*
+.playwright-mcp/

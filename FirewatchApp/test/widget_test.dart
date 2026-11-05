@@ -437,6 +437,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Exemplo demonstrativo'), findsNothing);
   });
+
+  testWidgets('controles do mapa não se sobrepõem em paisagem compacta', (
+    tester,
+  ) async {
+    await _openMap(tester);
+    tester.view.physicalSize = const Size(568, 320);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpAndSettle();
+
+    final locationTile = find.ancestor(
+      of: find.text('Escolher localização'),
+      matching: find.byType(ListTile),
+    );
+    final regionalAction = find.widgetWithText(
+      FilledButton,
+      'Analisar esta região',
+    );
+
+    expect(locationTile, findsOneWidget);
+    expect(regionalAction, findsOneWidget);
+    expect(
+      tester.getRect(locationTile).bottom,
+      lessThanOrEqualTo(tester.getRect(regionalAction).top),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('trocar coordenadas remove a camada da região anterior', (
     tester,
   ) async {
