@@ -11,6 +11,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../services/api_service.dart';
+import '../../shared/widgets/accessibility_widgets.dart';
 import '../../shared/widgets/risk_result_sheet.dart';
 import '../../shared/widgets/weather_metric_card.dart';
 import 'regional_risk_controller.dart';
@@ -419,15 +420,15 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                     bottom: 32,
                     child: Align(
                       alignment: Alignment.bottomCenter,
-                      child: FilledButton.tonalIcon(
+                      child: FilledButton.tonal(
                         onPressed: regionalState.loading
                             ? null
                             : _analyzeRegion,
-                        icon: const Icon(Icons.layers_outlined),
-                        label: Text(
-                          regionalState.loading
-                              ? 'Analisando região…'
-                              : 'Analisar esta região',
+                        child: LoadingButtonContent(
+                          label: 'Analisar esta região',
+                          loading: regionalState.loading,
+                          loadingLabel: 'Analisando região',
+                          icon: Icons.layers_outlined,
                         ),
                       ),
                     ),
@@ -505,9 +506,14 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                         const SizedBox(height: 12),
                         const LinearProgressIndicator(),
                         const SizedBox(height: 8),
-                        const Text('Consultando o local selecionado…'),
+                        const LiveRegionText(
+                          'Consultando o local selecionado…',
+                        ),
                       ] else if (_error != null) ...[
-                        Text(_error!, style: TextStyle(color: scheme.error)),
+                        LiveRegionText(
+                          _error!,
+                          style: TextStyle(color: scheme.error),
+                        ),
                         const SizedBox(height: 12),
                         FilledButton(
                           onPressed: _loadPrediction,

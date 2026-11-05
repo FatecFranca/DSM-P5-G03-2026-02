@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app.dart';
 import 'core/theme/app_theme.dart';
 import 'services/intro_preferences.dart';
+import 'shared/widgets/accessibility_widgets.dart';
 
 /// Aguarda o armazenamento local antes de decidir a primeira rota.
 class FirewatchBootstrap extends StatefulWidget {
@@ -43,7 +44,7 @@ class _FirewatchBootstrapState extends State<FirewatchBootstrap> {
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
+                          const LiveRegionText(
                             'Não foi possível acessar as preferências deste dispositivo.',
                             textAlign: TextAlign.center,
                           ),
@@ -55,7 +56,13 @@ class _FirewatchBootstrapState extends State<FirewatchBootstrap> {
                           ),
                         ],
                       )
-                    : const CircularProgressIndicator(),
+                    : Semantics(
+                        liveRegion: true,
+                        label: 'Carregando preferências do dispositivo.',
+                        child: const ExcludeSemantics(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
               ),
             ),
           ),

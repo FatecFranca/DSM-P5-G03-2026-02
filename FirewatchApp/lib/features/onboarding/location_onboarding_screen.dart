@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../services/location_service.dart';
+import '../../shared/widgets/accessibility_widgets.dart';
 
 /// Onboarding de localização.
 ///
@@ -126,7 +127,7 @@ class _LocationOnboardingScreenState
                         ),
                         const SizedBox(height: AppSpacing.xxl),
                         if (_locationError != null) ...[
-                          Text(
+                          LiveRegionText(
                             _locationError!,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,
@@ -136,16 +137,12 @@ class _LocationOnboardingScreenState
                         ],
                         FilledButton(
                           onPressed: _requesting ? null : _requestLocation,
-                          child: _requesting
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.charcoal,
-                                  ),
-                                )
-                              : const Text('Permitir localização'),
+                          child: LoadingButtonContent(
+                            label: 'Permitir localização',
+                            loading: _requesting,
+                            loadingLabel: 'Obtendo localização',
+                            progressColor: AppColors.charcoal,
+                          ),
                         ),
                         const SizedBox(height: AppSpacing.md),
                         OutlinedButton(

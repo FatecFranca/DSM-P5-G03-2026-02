@@ -211,7 +211,9 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => AppTypography.inter(
             states.contains(WidgetState.selected)
-                ? AppColors.orangeText
+                ? isDark
+                      ? AppColors.amber
+                      : AppColors.orangeText
                 : scheme.onSurfaceVariant,
             fontSize: 11,
             fontWeight: states.contains(WidgetState.selected)
@@ -222,7 +224,9 @@ abstract final class AppTheme {
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             color: states.contains(WidgetState.selected)
-                ? AppColors.orangeDark
+                ? isDark
+                      ? AppColors.amber
+                      : AppColors.orangeDark
                 : scheme.onSurfaceVariant,
             size: 24,
           ),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/geo_coordinates.dart';
 import '../../core/providers/app_providers.dart';
 import '../../services/geocoding_service.dart';
+import '../../shared/widgets/accessibility_widgets.dart';
 
 /// Escolha geográfica independente da disponibilidade da API de risco.
 class CoordinatesScreen extends ConsumerStatefulWidget {
@@ -128,21 +129,19 @@ class _CoordinatesScreenState extends ConsumerState<CoordinatesScreen> {
             onSubmitted: (_) => _search(),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(
+          FilledButton(
             onPressed: _searching ? null : _search,
-            icon: _searching
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.search),
-            label: Text(_searching ? 'Buscando…' : 'Buscar cidade'),
+            child: LoadingButtonContent(
+              label: 'Buscar cidade',
+              loading: _searching,
+              loadingLabel: 'Buscando',
+              icon: Icons.search,
+            ),
           ),
           if (_searchMessage != null)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Text(_searchMessage!),
+              child: LiveRegionText(_searchMessage!),
             ),
           for (final place in _places)
             ListTile(

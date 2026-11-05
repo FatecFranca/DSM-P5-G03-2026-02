@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/regional_risk.dart';
 import '../../core/models/risk_level.dart';
+import '../../shared/widgets/accessibility_widgets.dart';
 import 'regional_risk_controller.dart';
 
 class RegionalRiskPanel extends StatelessWidget {
@@ -29,11 +30,11 @@ class RegionalRiskPanel extends StatelessWidget {
         if (state.loading) ...[
           const LinearProgressIndicator(),
           const SizedBox(height: 8),
-          const Text(
+          const LiveRegionText(
             'Analisando até nove zonas. Isso pode levar alguns segundos…',
           ),
         ] else if (state.error != null)
-          Text(state.error!, style: TextStyle(color: scheme.error))
+          LiveRegionText(state.error!, style: TextStyle(color: scheme.error))
         else if (region != null) ...[
           Wrap(
             spacing: 12,

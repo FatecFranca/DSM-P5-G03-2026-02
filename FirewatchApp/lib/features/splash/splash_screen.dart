@@ -5,6 +5,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../shared/widgets/accessibility_widgets.dart';
 import '../../shared/widgets/flame_logo.dart';
 
 /// Abertura com a assinatura e o símbolo de destaque do brand board.
@@ -93,20 +94,17 @@ class _SplashScreenState extends State<SplashScreen> {
                           height: 56,
                           child: FilledButton(
                             onPressed: _saving ? null : _enter,
-                            child: _saving
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(AppConstants.splashStartLabel),
+                            child: LoadingButtonContent(
+                              label: AppConstants.splashStartLabel,
+                              loading: _saving,
+                              loadingLabel: 'Carregando',
+                              progressColor: AppColors.charcoal,
+                            ),
                           ),
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: AppSpacing.md),
-                          Text(
+                          LiveRegionText(
                             _error!,
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: AppColors.grayLight),
