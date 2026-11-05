@@ -39,22 +39,12 @@ class _PreventionScreenState extends State<PreventionScreen> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
           children: [
-            const AppHeader(),
+            const AppHeader(title: 'Prevenção'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Prevenção',
-                    style: AppTypography.sora(
-                      scheme.onSurface,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
                   Text(
                     'Cuidados e orientações para evitar queimadas.',
                     style: AppTypography.inter(

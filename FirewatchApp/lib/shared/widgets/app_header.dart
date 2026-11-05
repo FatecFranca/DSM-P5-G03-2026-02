@@ -15,12 +15,14 @@ class AppHeader extends StatelessWidget {
     this.onSettings,
     this.title,
     this.showBack = false,
+    this.showNotifications = true,
   });
 
   final VoidCallback? onNotifications;
   final VoidCallback? onSettings;
   final String? title;
   final bool showBack;
+  final bool showNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -56,11 +58,12 @@ class AppHeader extends StatelessWidget {
                       ),
                     ),
             ),
-            IconButton(
-              onPressed: onNotifications ?? () => context.go('/alerts'),
-              icon: const Icon(Icons.notifications_none_rounded),
-              tooltip: 'Notificações',
-            ),
+            if (showNotifications)
+              IconButton(
+                onPressed: onNotifications ?? () => context.go('/alerts'),
+                icon: const Icon(Icons.notifications_none_rounded),
+                tooltip: 'Notificações',
+              ),
             IconButton(
               onPressed: onSettings ?? () => context.push('/settings'),
               icon: const Icon(Icons.settings_outlined),

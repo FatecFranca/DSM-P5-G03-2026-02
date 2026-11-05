@@ -20,17 +20,12 @@ class AlertsScreen extends ConsumerWidget {
         bottom: false,
         child: ListView(
           children: [
-            const AppHeader(),
+            const AppHeader(title: 'Alertas', showNotifications: false),
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Alertas',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 8),
                   const Text(
                     'Orientações de risco da última consulta. Não são notificações automáticas nem confirmação de incêndio.',
                   ),
@@ -45,7 +40,7 @@ class AlertsScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     FilledButton(
                       onPressed: () => context.go('/'),
-                      child: const Text('Consultar um local'),
+                      child: const Text('Ir para o mapa'),
                     ),
                   ] else ...[
                     Container(

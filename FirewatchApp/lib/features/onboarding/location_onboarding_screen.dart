@@ -160,7 +160,7 @@ class _LocationOnboardingScreenState
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          child: const Text('Buscar localização'),
+                          child: const Text('Buscar cidade ou coordenadas'),
                         ),
                         const SizedBox(height: AppSpacing.lg),
                       ],

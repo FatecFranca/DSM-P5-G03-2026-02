@@ -11,6 +11,7 @@ import 'package:firewatch/services/api_service.dart';
 import 'package:firewatch/services/geocoding_service.dart';
 import 'package:firewatch/services/intro_preferences.dart';
 import 'package:firewatch/services/location_service.dart';
+import 'package:firewatch/shared/widgets/app_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -154,8 +155,13 @@ Future<void> _enterPoint(WidgetTester tester) async {
   final fields = find.byType(TextFormField);
   await tester.enterText(fields.at(0), '-20.5386');
   await tester.enterText(fields.at(1), '-47.4008');
-  await tester.ensureVisible(find.text('Confirmar coordenadas'));
-  await tester.tap(find.text('Confirmar coordenadas'));
+  final confirmButton = find.widgetWithText(
+    OutlinedButton,
+    'Confirmar coordenadas',
+  );
+  await Scrollable.ensureVisible(tester.element(confirmButton), alignment: 0.8);
+  await tester.pumpAndSettle();
+  await tester.tap(confirmButton);
   await tester.pumpAndSettle();
 }
 
@@ -201,8 +207,8 @@ void main() {
       find.textContaining('Permissão de localização negada'),
       findsOneWidget,
     );
-    await tester.ensureVisible(find.text('Buscar localização'));
-    await tester.tap(find.text('Buscar localização'));
+    await tester.ensureVisible(find.text('Buscar cidade ou coordenadas'));
+    await tester.tap(find.text('Buscar cidade ou coordenadas'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'Franca');
     await tester.tap(find.text('Buscar cidade'));
@@ -247,7 +253,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Onde você está?'), findsOneWidget);
     expect(find.text('Permitir localização'), findsOneWidget);
-    expect(find.text('Buscar localização'), findsOneWidget);
+    expect(find.text('Buscar cidade ou coordenadas'), findsOneWidget);
+  });
+
+  testWidgets('busca manual orienta e permite retornar ao mapa', (
+    tester,
+  ) async {
+    await _pumpApp(tester);
+    await tester.tap(find.text('Entrar no app'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Buscar cidade ou coordenadas'));
+    await tester.tap(find.text('Buscar cidade ou coordenadas'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Escolher localização'), findsOneWidget);
+    expect(
+      find.text(
+        'Para escolher diretamente no mapa, volte à tela Mapa e toque no ponto desejado.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.enterText(find.byType(TextField).first, 'Franca');
+    await tester.tap(find.text('Buscar cidade'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Franca, São Paulo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FlutterMap), findsOneWidget);
+
+    await tester.tap(find.text('Franca, SP'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Escolher no mapa'));
+    await tester.tap(find.text('Escolher no mapa'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FlutterMap), findsOneWidget);
   });
 
   testWidgets('pular abre mapa real sem inventar localização ou risco', (
@@ -270,6 +309,17 @@ void main() {
       await tester.tap(find.text('Alertas'));
       await tester.pumpAndSettle();
       expect(find.text('Nenhuma consulta disponível.'), findsOneWidget);
+      expect(find.byTooltip('Notificações'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(AppHeader),
+          matching: find.text('Alertas'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Ir para o mapa'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FlutterMap), findsOneWidget);
       await tester.tap(find.text('Prevenção'));
       await tester.pumpAndSettle();
       expect(find.text('Como se proteger'), findsOneWidget);
@@ -390,8 +440,16 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), '-21.1704');
     await tester.enterText(fields.at(1), '-47.8103');
-    await tester.ensureVisible(find.text('Confirmar coordenadas'));
-    await tester.tap(find.text('Confirmar coordenadas'));
+    final confirmButton = find.widgetWithText(
+      OutlinedButton,
+      'Confirmar coordenadas',
+    );
+    await Scrollable.ensureVisible(
+      tester.element(confirmButton),
+      alignment: 0.8,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(confirmButton);
     await tester.pumpAndSettle();
     final container = ProviderScope.containerOf(
       tester.element(find.byType(MonitoringScreen)),

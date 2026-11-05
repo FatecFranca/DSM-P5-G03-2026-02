@@ -162,7 +162,17 @@ class _CoordinatesScreenState extends ConsumerState<CoordinatesScreen> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
-          const Text('Você também pode escolher um ponto tocando no mapa.'),
+          const Text(
+            'Para escolher diretamente no mapa, volte à tela Mapa e toque no ponto desejado.',
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => context.go('/'),
+              icon: const Icon(Icons.map_outlined),
+              label: const Text('Escolher no mapa'),
+            ),
+          ),
           const SizedBox(height: 20),
           Form(
             key: _form,
