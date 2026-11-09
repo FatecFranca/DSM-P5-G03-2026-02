@@ -8,3 +8,8 @@
 .windsurf/
 .aider*
 .playwright-mcp/
+
+# Dataset oficial transferido separadamente para cada ambiente
+firewatch_preprocessado*.csv
+firewatch_preprocessado*.csv.gz
+firewatch_preprocessado*.xlsx

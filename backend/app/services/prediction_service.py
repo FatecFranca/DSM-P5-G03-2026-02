@@ -1,8 +1,7 @@
-"""Carregamento e execucao do modelo de Machine Learning (Random Forest).
+"""Carregamento e execução do modelo logístico de risco de fogo.
 
-O modelo e um ``RandomForestClassifier`` treinado com dados do banco
-(``firewatch_dados``) para prever a classe de risco de fogo do dia
-(``Risco Baixo`` / ``Risco Moderado`` / ``Risco Crítico``).
+O artefato foi treinado a partir de ``firewatch_preprocessado`` e usa dias sem
+chuva, precipitação em milímetros e a sazonalidade da data.
 
 A API expoe as tres probabilidades por classe; o campo ``probabilidade``
 principal e a probabilidade de a classe ser ``Risco Crítico``.
@@ -12,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from app.config import settings
 from app.models.schemas import WeatherData
 from app.services.classificacao import (
     CLASSES,
@@ -28,52 +29,31 @@ from app.services.classificacao import (
     nivel_do_codigo,
 )
 from ml.alvo import N_CLASSES
-from ml.features import FEATURES, construir_features
+from ml.modelo_logistico import FEATURES, construir_features
 
 logger = logging.getLogger(__name__)
 
 #: Caminho padrao do artefato treinado.
-MODELO_PADRAO = Path(__file__).resolve().parents[2] / "ml" / "modelo.pkl"
+MODELO_PADRAO = Path(__file__).resolve().parents[2] / "ml" / "modelo_risco_fogo_logistica.joblib"
 
 
 class ModelNotAvailableError(RuntimeError):
-    """O artefato modelo.pkl nao existe ou nao pode ser desserializado."""
-
-
-def _bruto_de_clima(clima: WeatherData) -> dict[str, Any]:
-    """Mapeia o clima de producao para as features fisicas do modelo."""
-    temp_max = clima.temperatura_max_c if clima.temperatura_max_c is not None else clima.temperatura_c
-    temp_min = clima.temperatura_min_c if clima.temperatura_min_c is not None else clima.temperatura_c
-    precipitacao = (
-        clima.precipitacao_diaria_mm
-        if clima.precipitacao_diaria_mm is not None
-        else clima.precipitacao_mm
-    )
-    vento = clima.vento_max_kmh if clima.vento_max_kmh is not None else clima.velocidade_vento_kmh
-    dias_sem_chuva = clima.dias_sem_chuva if clima.dias_sem_chuva is not None else 0.0
-
-    return {
-        "temp_max": temp_max,
-        "temp_min": temp_min,
-        "umidade": clima.umidade_relativa,
-        "precipitacao_mm": precipitacao,
-        "velocidade_vento": vento,
-        "dias_sem_chuva": dias_sem_chuva,
-    }
+    """O artefato do modelo não existe, é inválido ou não pode ser carregado."""
 
 
 class PredictionService:
     """Carrega o modelo uma vez e responde consultas de risco."""
 
     def __init__(self, caminho: Path | str | None = None) -> None:
-        self.caminho = Path(caminho) if caminho else MODELO_PADRAO
+        configurado = caminho or settings.MODEL_PATH
+        self.caminho = Path(configurado) if configurado else MODELO_PADRAO
         self._bundle: dict[str, Any] | None = None
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------- ciclo de vida
 
     def carregar(self) -> dict[str, Any]:
-        """Desserializa o modelo.pkl (uma unica vez, de forma thread-safe)."""
+        """Desserializa o artefato uma única vez, de forma thread-safe."""
         if self._bundle is not None:
             return self._bundle
 
@@ -82,10 +62,7 @@ class PredictionService:
                 return self._bundle
 
             if not self.caminho.exists():
-                raise ModelNotAvailableError(
-                    f"Modelo nao encontrado em {self.caminho}. "
-                    "Execute: python ml/treinamento.py"
-                )
+                raise ModelNotAvailableError(f"Modelo não encontrado em {self.caminho}.")
             try:
                 bundle = joblib.load(self.caminho)
             except Exception as exc:  # noqa: BLE001
@@ -103,15 +80,16 @@ class PredictionService:
                 raise ModelNotAvailableError(
                     "Incompatibilidade entre o modelo e o codigo: "
                     f"modelo treinado com {features_do_modelo}, codigo espera {FEATURES}. "
-                    "Retreine com: python ml/treinamento.py"
+                    "Use o artefato modelo_risco_fogo_logistica.joblib."
                 )
 
-            classes_do_modelo = tuple(bundle.get("classes") or CLASSES)
-            if classes_do_modelo != CLASSES:
+            rotulos = bundle.get("rotulos")
+            if rotulos != {0: "Baixo", 1: "Moderado", 2: "Crítico"}:
+                raise ModelNotAvailableError(f"Rótulos incompatíveis no modelo: {rotulos}.")
+            classes_do_modelo = tuple(getattr(bundle["modelo"], "classes_", ()))
+            if classes_do_modelo != (0, 1, 2):
                 raise ModelNotAvailableError(
-                    "Incompatibilidade das classes: "
-                    f"modelo treinado com {classes_do_modelo}, codigo espera {CLASSES}. "
-                    "Retreine com: python ml/treinamento.py"
+                    f"Classes incompatíveis no modelo: {classes_do_modelo}."
                 )
 
             self._bundle = bundle
@@ -127,12 +105,12 @@ class PredictionService:
         bundle = self._bundle or {}
         return {
             "arquivo": self.caminho.name,
-            "algoritmo": bundle.get("algoritmo", "RandomForestClassifier"),
+            "algoritmo": bundle.get("algoritmo", "LogisticRegression"),
             "alvo": bundle.get("alvo", "classe_risco"),
             "classes": list(bundle.get("classes") or CLASSES),
             "features": list(bundle.get("features") or FEATURES),
             "treinado_em": bundle.get("treinado_em"),
-            "dataset": bundle.get("dataset"),
+            "dataset": bundle.get("dataset", "firewatch_preprocessado"),
             "metricas": bundle.get("metricas", {}),
             "importancias": bundle.get("importancias", {}),
         }
@@ -144,7 +122,17 @@ class PredictionService:
         bundle = self.carregar()
         modelo = bundle["modelo"]
 
-        features = construir_features(_bruto_de_clima(clima))
+        data_referencia = (clima.horario or datetime.now(UTC)).date()
+        precipitacao = (
+            clima.precipitacao_diaria_mm
+            if clima.precipitacao_diaria_mm is not None
+            else clima.precipitacao_mm
+        )
+        features = construir_features(
+            dias_sem_chuva=clima.dias_sem_chuva,
+            precipitacao_mm=precipitacao,
+            data_referencia=data_referencia,
+        )
         matriz = pd.DataFrame([[features[nome] for nome in FEATURES]], columns=list(FEATURES))
 
         try:

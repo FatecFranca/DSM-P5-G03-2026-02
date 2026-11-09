@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     DB_NAME: str = "firewatch_db"
     DB_USER: str = "postgres"
     DB_PASSWORD: str = ""
+    DB_POOL_MIN: int = Field(default=1, ge=1)
+    DB_POOL_MAX: int = Field(default=5, ge=1)
+    DB_CONNECT_TIMEOUT: float = Field(default=10.0, gt=0)
+    DB_COMMAND_TIMEOUT: float = Field(default=30.0, gt=0)
+    MODEL_PATH: str = ""
 
     model_config = SettingsConfigDict(
         # caminho absoluto: o .env e encontrado independente do diretorio de execucao

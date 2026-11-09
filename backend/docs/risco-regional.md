@@ -55,7 +55,8 @@ atualizar o artefato do modelo; não substituir o arquivo de um processo em uso.
 ## Executar e implantar
 
 Instalar `requirements.txt` no ambiente Python compatível com o artefato, incluindo
-Shapely, e disponibilizar o mesmo `ml/modelo.pkl` utilizado na consulta pontual.
+Shapely, e configurar `MODEL_PATH` para o mesmo
+`modelo_risco_fogo_logistica.joblib` utilizado na consulta pontual.
 Executar a API pelo comando habitual, por exemplo:
 
 ```shell
@@ -96,8 +97,8 @@ Fixtures são restritas aos testes; a aplicação não as utiliza como fallback.
 - O limite é por processo e não substitui autenticação. Em múltiplos workers,
   aplicar limite compartilhado no proxy. Configure o servidor para confiar em
   cabeçalhos de IP encaminhado somente quando vierem do proxy controlado.
-- Preserve `.env` e `ml/modelo.pkl` da VM, que não pertencem ao Git. Não treine
-  nem troque o modelo só para publicar esta rota. Faça backup antes da atualização.
+- Transfira o modelo logístico separadamente; `.env` e arquivos `*.joblib` não pertencem
+  ao Git. Faça backup antes de qualquer atualização do artefato.
 - Instale as dependências em ambiente compatível com o modelo, confirme que
   `app/data/brasil.geojson` foi publicado e reinicie o serviço pelo mecanismo já
   usado na VM. Se o modelo não carregar, não considere o deploy concluído.

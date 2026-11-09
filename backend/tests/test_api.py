@@ -185,6 +185,8 @@ class TestApi:
         assert corpo["status"] in {"ok", "degradado"}
         assert corpo["versao"]
         assert corpo["banco"] in {"ok", "desconectado", "erro"}
+        assert corpo["dataset"] in {"ok", "erro"}
+        assert corpo["dataset_registros"] is None or corpo["dataset_registros"] >= 0
         assert corpo["classes"] == list(CLASSES)
 
     def test_docs_disponiveis(self, cliente):
@@ -212,7 +214,7 @@ class TestApi:
 
     def test_predicao_completa(self, cliente, modelo_disponivel):
         if not modelo_disponivel:
-            pytest.skip("modelo.pkl ausente: rode python ml/treinamento.py")
+            pytest.skip("artefato do modelo logístico ausente")
 
         resposta = cliente.post(
             "/api/v1/prever-risco",
@@ -248,7 +250,7 @@ class TestApi:
 
     def test_classe_coerente_com_probabilidades(self, cliente, modelo_disponivel):
         if not modelo_disponivel:
-            pytest.skip("modelo.pkl ausente")
+            pytest.skip("artefato do modelo logístico ausente")
 
         corpo = cliente.post(
             "/api/v1/prever-risco", json={"latitude": -23.55, "longitude": -46.63}
@@ -265,7 +267,7 @@ class TestApi:
 
     def test_percentual_consistente(self, cliente, modelo_disponivel):
         if not modelo_disponivel:
-            pytest.skip("modelo.pkl ausente")
+            pytest.skip("artefato do modelo logístico ausente")
 
         corpo = cliente.post(
             "/api/v1/prever-risco", json={"latitude": -3.12, "longitude": -60.02}
@@ -278,7 +280,7 @@ class TestApi:
 
     def test_variacao_entre_regioes(self, cliente, modelo_disponivel):
         if not modelo_disponivel:
-            pytest.skip("modelo.pkl ausente")
+            pytest.skip("artefato do modelo logístico ausente")
 
         resultados = {
             cidade: cliente.post(

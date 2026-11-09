@@ -1,6 +1,6 @@
 """FireWatch API - classificacao e predicao de risco de incendio florestal.
 
-Fluxo: GPS (app mobile) -> Open-Meteo -> Random Forest -> nivel de risco -> app.
+Fluxo: GPS (app mobile) -> Open-Meteo -> modelo logístico -> nível de risco -> app.
 """
 
 from __future__ import annotations
@@ -18,10 +18,11 @@ from app.config import settings
 from app.db import db, get_db_config
 from app.models.schemas import HealthResponse
 from app.rate_limit import RiskRateLimitMiddleware
+from app.routes.dataset import dataset_router
 from app.routes.risk import risk_router
 from app.services.classificacao import CLASSES
 from app.services.prediction_service import ModelNotAvailableError, prediction_service
-from ml.features import FEATURES
+from ml.modelo_logistico import FEATURES
 
 logging.basicConfig(
     level=logging.INFO,
@@ -128,7 +129,7 @@ app = FastAPI(
     description=(
         "API de classificacao e predicao de risco de incendio florestal. "
         "Recebe latitude/longitude do aplicativo mobile, consulta a Open-Meteo "
-        "e aplica um classificador Random Forest que retorna a classe de risco "
+        "e aplica um classificador logístico que retorna a classe de risco "
         "(Risco Baixo / Risco Moderado / Risco Critico), as probabilidades de "
         "cada classe e uma recomendacao."
     ),
@@ -154,6 +155,7 @@ app.add_middleware(
 )
 
 app.include_router(risk_router)
+app.include_router(dataset_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -176,6 +178,7 @@ async def raiz() -> dict[str, str]:
         "docs": "/docs",
         "health": "/health",
         "predicao": "POST /api/v1/prever-risco",
+        "dados": "GET /api/v1/dados",
     }
 
 
@@ -193,18 +196,33 @@ async def health() -> HealthResponse:
 
     # Verifica conectividade com banco de dados
     db_status = "desconectado"
+    dataset_status = "erro"
+    dataset_registros = None
     try:
         async with db.get_connection() as conn:
             await conn.fetchval("SELECT 1")
             db_status = "ok"
+            try:
+                dataset_registros = await conn.fetchval(
+                    "SELECT count(*) FROM public.firewatch_preprocessado"
+                )
+                dataset_status = "ok"
+            except Exception:  # noqa: BLE001 - tabela ainda não migrada
+                dataset_status = "erro"
     except Exception:  # noqa: BLE001
         db_status = "erro"
 
     return HealthResponse(
-        status="ok" if carregado else "degradado",
+        status=(
+            "ok"
+            if carregado and db_status == "ok" and dataset_status == "ok"
+            else "degradado"
+        ),
         versao=__version__,
         modelo_carregado=carregado,
         banco=db_status,
+        dataset=dataset_status,
+        dataset_registros=dataset_registros,
         features=list(FEATURES),
         classes=list(CLASSES),
         acerto_estimado=metricas.get("accuracy"),

@@ -8,7 +8,7 @@ aplica um modelo de Machine Learning e devolve o nível de risco com probabilida
 recomendações de prevenção.
 
 O projeto é composto por um **aplicativo mobile em Flutter** e por uma **API em FastAPI**
-com um classificador **Random Forest** treinado a partir de dados históricos armazenados
+com uma **Regressão Logística balanceada** treinada a partir do dataset preprocessado
 em PostgreSQL.
 
 **Equipe:** G03 — FireWatch  
@@ -46,7 +46,7 @@ A partir de uma latitude e longitude, o sistema:
 
 1. consulta a **Open-Meteo** para obter as condições atuais e o histórico recente de chuva;
 2. transforma os dados meteorológicos nas features usadas pelo modelo;
-3. aplica um classificador **Random Forest** treinado com dados históricos de risco de fogo;
+3. aplica uma **Regressão Logística balanceada** treinada com dados históricos de risco;
 4. retorna a classe de risco — **Baixo**, **Moderado** ou **Crítico** —, as probabilidades de
    cada classe, uma cor de alerta e uma recomendação;
 5. apresenta o resultado no aplicativo, junto com os dados climáticos que sustentam a previsão.
@@ -65,10 +65,10 @@ flowchart LR
     B --> C[API FastAPI]
     C -->|Clima atual + 60 dias de chuva| D[Open-Meteo]
     C --> E[Features meteorológicas]
-    E --> F[modelo.pkl - Random Forest]
+    E --> F[modelo logístico - artefato joblib]
     F --> G[Classe + probabilidades + recomendação]
     G --> A
-    C -.->|Treinamento / health| H[(PostgreSQL)]
+    C -->|Consultas históricas / health| H[(PostgreSQL)]
     A -->|Nome da cidade| I[Nominatim]
     A -->|Mapa| J[Tiles OpenStreetMap]
 ```
@@ -80,9 +80,9 @@ GPS / coordenadas
         ↓
 Open-Meteo (clima atual + histórico de precipitação)
         ↓
-Engenharia de features (6 variáveis)
+Engenharia de features (4 variáveis)
         ↓
-Random Forest (3 classes de risco)
+Regressão Logística (3 classes de risco)
         ↓
 Risco Baixo / Moderado / Crítico + probabilidades + recomendação
         ↓
@@ -128,9 +128,10 @@ Aplicativo Flutter
 - Validação de coordenadas com **Pydantic**.
 - Classificação em três níveis com probabilidades, cor e recomendação.
 - Health check com estado do modelo e do banco de dados.
+- Dataset histórico oficial consultável com filtros, paginação e estatísticas.
 - Pool de conexões assíncrono com **asyncpg**.
 - CORS configurável por variáveis de ambiente.
-- Pipeline de treinamento, reavaliação e busca de hiperparâmetros do modelo.
+- Modelo logístico balanceado validado temporalmente em setembro de 2024.
 
 ---
 
@@ -147,10 +148,10 @@ O aplicativo não acessa o banco de dados diretamente. Credenciais e regras de n
 exclusivamente no backend. A comunicação ocorre por HTTPS com a API, e a API utiliza a
 Open-Meteo e o modelo local para produzir a resposta.
 
-A API está configurada para o ambiente de produção em:
+A URL reservada para o ambiente de produção é:
 
 ```text
-https://firewatch-api.chilecentral.cloudapp.azure.com
+https://firewatch-api-iago-2026.chilecentral.cloudapp.azure.com
 ```
 
 ---
@@ -178,9 +179,9 @@ https://firewatch-api.chilecentral.cloudapp.azure.com
 | **Pydantic v2** | Validação e schemas |
 | **asyncpg** | Acesso assíncrono ao PostgreSQL |
 | **httpx** | Cliente HTTP para a Open-Meteo |
-| **scikit-learn** | Random Forest, métricas e validação cruzada |
+| **scikit-learn** | Regressão Logística, padronização e métricas |
 | **pandas / numpy / scipy** | Manipulação e análise dos dados |
-| **joblib** | Persistência do modelo (`modelo.pkl`) |
+| **joblib** | Carregamento do modelo logístico (`*.joblib`) |
 | **python-dotenv** | Carregamento do arquivo `.env` |
 | **pytest** | Testes automatizados |
 
@@ -206,7 +207,8 @@ DSM-P5-G03-2026-02/
 │   │   ├── main.py                 # Criação da API, health check e lifespan
 │   │   ├── config.py               # Configurações via variáveis de ambiente
 │   │   ├── db.py                   # Pool de conexões PostgreSQL
-│   │   ├── models/schemas.py       # Schemas de entrada e saída
+│   │   ├── models/                 # Schemas de entrada e saída
+│   │   ├── routes/dataset.py       # Consulta ao dataset histórico
 │   │   ├── routes/risk.py          # Endpoint /api/v1/prever-risco
 │   │   └── services/
 │   │       ├── weather_service.py  # Integração com a Open-Meteo
@@ -216,13 +218,15 @@ DSM-P5-G03-2026-02/
 │   │   ├── alvo.py                 # Definição das classes e cortes
 │   │   ├── dados.py                # Leitura do dataset no PostgreSQL
 │   │   ├── features.py             # Engenharia de features
-│   │   ├── treinamento.py          # Treino e persistência do modelo
+│   │   ├── treinamento.py          # Pipeline legado, não usado no deploy
 │   │   ├── avaliacao.py            # Avaliação e cenários climáticos
-│   │   └── modelo.pkl              # Modelo treinado
+│   │   └── modelo_risco_fogo_logistica.joblib # Artefato externo ao Git
 │   ├── tests/
 │   │   ├── test_api.py
 │   │   └── test_fallback.py
 │   ├── requirements.txt
+│   ├── migrations/                 # Schema PostgreSQL versionado
+│   ├── scripts/                    # Migration e importação reproduzível
 │   ├── ruff.toml
 │   └── .env.example
 └── FirewatchApp/
@@ -252,8 +256,9 @@ DSM-P5-G03-2026-02/
 - **PostgreSQL** (necessário para treinar o modelo e testar a conexão com o banco)
 - Um emulador ou dispositivo para executar o aplicativo
 
-O backend consegue iniciar mesmo sem o banco disponível, mas o endpoint de predição exige
-o arquivo `modelo.pkl` carregado. O modelo treinado já está incluído no repositório.
+O backend consegue iniciar em modo degradado sem o banco disponível. O endpoint de predição
+também exige o artefato `modelo_risco_fogo_logistica.joblib`, gerado pelo trabalho de Machine
+Learning. Ele é ignorado pelo Git e deve ser transferido separadamente para cada ambiente.
 
 ### 1. Backend
 
@@ -288,24 +293,35 @@ Depois de iniciar:
 Edite o arquivo `backend/.env` com as credenciais do seu PostgreSQL antes de usar os
 endpoints que dependem do banco ou de treinar o modelo.
 
-### 2. Treinamento do modelo
+### 2. Dataset histórico no PostgreSQL
 
-Com o banco configurado e a tabela `firewatch_dados` disponível:
+Com o PostgreSQL iniciado e o `.env` configurado, aplique o schema e importe o arquivo
+oficial. O caminho do CSV é configurável; o importador valida o cabeçalho e cada valor,
+processa em lotes e pode ser reexecutado sem duplicar registros:
 
 ```bash
 cd backend
-python ml/treinamento.py
+python -m scripts.aplicar_migrations
+python -m scripts.importar_dataset \
+  --arquivo "/caminho/para/firewatch_preprocessado.csv"
 ```
 
-Opções disponíveis:
+O arquivo esperado possui as colunas `linha_origem`, `data`, `municipio`, `estado`, `bioma`,
+`avg_numero_dias_sem_chuva`, `avg_precipitacao`, `avg_risco_fogo`, `avg_frp` e
+`bioma_ausente_original`, nessa ordem. O dataset não é versionado no Git. Na implantação,
+ele deve ser transferido separadamente para a VM, importado no PostgreSQL e pode ser removido
+da VM depois da conferência da importação e do backup.
 
-```bash
-python ml/treinamento.py --reavaliar  # reavalia o modelo salvo sem retreinar
-python ml/treinamento.py --buscar     # busca de hiperparâmetros com GridSearchCV
-python ml/avaliacao.py --cenarios     # métricas, biomas e cenários climáticos
+### 3. Modelo de Machine Learning
+
+O backend não retreina o modelo durante a instalação. Transfira o artefato final por canal
+seguro e configure seu caminho no `.env`:
+
+```dotenv
+MODEL_PATH=/opt/firewatch/modelo_risco_fogo_logistica.joblib
 ```
 
-### 3. Aplicativo Flutter
+### 4. Aplicativo Flutter
 
 ```bash
 cd FirewatchApp
@@ -313,12 +329,12 @@ flutter pub get
 flutter run
 ```
 
-O aplicativo está configurado para consumir a API de produção definida em
-`FirewatchApp/lib/config/env_config.dart`:
+Na fase de integração mobile, configure a API de produção em
+`FirewatchApp/lib/config/env_config.dart` com:
 
 ```dart
 static const String apiBaseUrl =
-    'https://firewatch-api.chilecentral.cloudapp.azure.com';
+    'https://firewatch-api-iago-2026.chilecentral.cloudapp.azure.com';
 ```
 
 Para usar um backend local, altere essa constante para o endereço correspondente:
@@ -356,6 +372,11 @@ As configurações são carregadas de `backend/.env` por `pydantic-settings` e
 | `DB_NAME` | `firewatch_db` | Nome do banco |
 | `DB_USER` | `postgres` | Usuário do banco |
 | `DB_PASSWORD` | vazio | Senha do banco |
+| `DB_POOL_MIN` | `1` | Mínimo de conexões no pool |
+| `DB_POOL_MAX` | `5` | Máximo de conexões no pool |
+| `DB_CONNECT_TIMEOUT` | `10` | Timeout para obter/conectar ao banco, em segundos |
+| `DB_COMMAND_TIMEOUT` | `30` | Timeout padrão das consultas, em segundos |
+| `MODEL_PATH` | vazio | Caminho do artefato logístico externo ao Git |
 
 > O fallback climático é destinado a desenvolvimento e demonstrações offline. Em produção,
 > mantenha `PERMITIR_FALLBACK_CLIMA=false` para não mascarar indisponibilidades da fonte real.
@@ -372,6 +393,8 @@ As configurações são carregadas de `backend/.env` por `pydantic-settings` e
 | `GET` | `/health` | Estado do serviço, do modelo e do banco |
 | `POST` | `/api/v1/prever-risco` | Predição de risco para uma coordenada |
 | `POST` | `/api/v1/risco-regional` | Até nove zonas de risco com recorte territorial e cache |
+| `GET` | `/api/v1/dados` | Registros históricos filtrados e paginados |
+| `GET` | `/api/v1/dados/estatisticas` | Agregações do dataset histórico |
 | `GET` | `/docs` | Documentação Swagger UI |
 | `GET` | `/redoc` | Documentação ReDoc |
 | `GET` | `/openapi.json` | Especificação OpenAPI |
@@ -429,26 +452,22 @@ curl -X POST http://localhost:8000/api/v1/prever-risco \
 
 ## Modelo de Machine Learning
 
-### Dataset
+### Dataset histórico oficial
 
-O treinamento utiliza a tabela `firewatch_dados` do PostgreSQL, com registros de
-**1º de janeiro a 30 de setembro de 2024** (aproximadamente **177.779 registros**).
-As colunas meteorológicas chegam padronizadas em z-score com prefixo `avg_` e são
-convertidas de volta para unidades físicas durante a leitura.
+A tabela `firewatch_preprocessado` mantém os 157.682 registros oficiais de 1º de janeiro a
+9 de setembro de 2024. A importação preserva os valores finais sem recalcular classes.
 
 ### Variáveis de entrada
 
 | Feature | Descrição |
 | --- | --- |
-| `temp_max` | Temperatura máxima do dia (°C) |
-| `temp_min` | Temperatura mínima do dia (°C) |
-| `umidade` | Umidade relativa do ar (%) |
-| `precipitacao_mm` | Precipitação acumulada (mm) |
-| `velocidade_vento` | Velocidade do vento (km/h) |
-| `dias_sem_chuva` | Dias consecutivos sem chuva |
+| `avg_numero_dias_sem_chuva` | Quantidade média de dias sem chuva |
+| `precipitacao_mm_estimada` | Precipitação convertida para milímetros |
+| `dia_ano_seno` | Componente sazonal seno do dia do ano |
+| `dia_ano_cosseno` | Componente sazonal cosseno do dia do ano |
 
-A ordem das features é canônica e definida em `backend/ml/features.py`. O treinamento e a
-inferência importam a mesma definição, garantindo consistência entre as duas etapas.
+A ordem das features de inferência é definida em `backend/ml/modelo_logistico.py` e validada
+contra os metadados armazenados no artefato.
 
 ### Classes de risco
 
@@ -466,20 +485,17 @@ avaliação e API.
 
 ### Treinamento
 
-- Algoritmo: `RandomForestClassifier`
-- Árvores: `300`
-- Profundidade máxima: `24`
-- Mínimo de amostras por folha: `25`
-- Fração de features por divisão: `0.6`
+- Algoritmo: `LogisticRegression` com `class_weight="balanced"`
+- Pré-processamento: preenchimento pela mediana e `StandardScaler`
 - `random_state`: `42`
-- Separação temporal: **80% para treino / 20% para teste**, ordenada por data
-- Métricas: accuracy, balanced accuracy, F1 macro, F1 weighted, ROC-AUC OVR, matriz de
-  confusão e desempenho por classe
-- Validação cruzada: `KFold` com 4 dobras e F1 macro
+- Confirmação temporal: registros de 1 a 9 de setembro de 2024
+- Acurácia: `84,32%`
+- Acurácia balanceada: `52,99%`
+- F1 macro: `52,93%`
+- Recall da classe Crítico: `91,99%`
 
-O modelo treinado é salvo em `backend/ml/modelo.pkl` com metadados: algoritmo, features,
-classes, hiperparâmetros, métricas, importâncias das features, data de treinamento e versão
-do scikit-learn.
+O artefato final é `modelo_risco_fogo_logistica.joblib`. O backend apenas valida e executa
+esse artefato; o processo científico permanece no projeto de Machine Learning.
 
 ---
 
@@ -492,11 +508,18 @@ cd backend
 python -m pytest -q
 ```
 
+Os testes reais com o PostgreSQL importado são opt-in para manter a suíte unitária portátil:
+
+```bash
+FIREWATCH_TEST_DATABASE=1 python -m pytest -q tests/test_dataset_integration.py
+```
+
 A suíte cobre:
 
 - engenharia e normalização das features;
 - definição das classes, cortes e rótulos;
 - respostas da API, validação de coordenadas e documentação;
+- validação, importação, filtros, paginação e estatísticas do dataset histórico;
 - consistência entre classe prevista e probabilidades;
 - cache, timeout, retry e fallback da Open-Meteo;
 - endpoints de health e teste de banco.
@@ -525,7 +548,7 @@ Os testes cobrem:
 
 - Backend FastAPI com predição real e documentação automática.
 - Integração com Open-Meteo, cache, retry e fallback configurável.
-- Modelo Random Forest treinado, versionado e carregado pela API.
+- Modelo logístico externo ao Git, validado e carregado pela API.
 - Aplicativo Flutter com onboarding por GPS ou coordenadas manuais.
 - Tela de monitoramento com mapa, clima atual e risco real.
 - Testes automatizados no backend e no aplicativo.

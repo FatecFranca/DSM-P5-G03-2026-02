@@ -111,10 +111,7 @@ class RegionalService:
     async def _infer_local(self, latitude: float, longitude: float) -> Sample:
         weather = await self._weather.obter_clima(latitude, longitude)
         required = (
-            weather.temperatura_max_c,
-            weather.temperatura_min_c,
             weather.precipitacao_diaria_mm,
-            weather.vento_max_kmh,
             weather.dias_sem_chuva,
         )
         if any(value is None or not math.isfinite(value) for value in required):

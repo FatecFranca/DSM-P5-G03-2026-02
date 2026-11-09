@@ -38,6 +38,19 @@ def get_db_config() -> dict:
     }
 
 
+def get_pool_config() -> dict:
+    """Configura limites e timeouts do pool separadamente da conexão direta."""
+    config = {
+        "pool_min": int(os.getenv("DB_POOL_MIN", "1")),
+        "pool_max": int(os.getenv("DB_POOL_MAX", "5")),
+        "connect_timeout": float(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+        "command_timeout": float(os.getenv("DB_COMMAND_TIMEOUT", "30")),
+    }
+    if not 0 < config["pool_min"] <= config["pool_max"]:
+        raise ValueError("DB_POOL_MIN deve ser positivo e não superar DB_POOL_MAX.")
+    return config
+
+
 class Database:
     """Manages a single asyncpg connection pool for the application."""
 
@@ -53,15 +66,17 @@ class Database:
             if self.pool is not None:  # outra corrotina ja inicializou
                 return
             config = get_db_config()
+            pool_config = get_pool_config()
             self.pool = await asyncpg.create_pool(
                 host=config["host"],
                 port=config["port"],
                 database=config["database"],
                 user=config["user"],
                 password=config["password"],
-                min_size=1,
-                max_size=10,
-                command_timeout=60,
+                min_size=pool_config["pool_min"],
+                max_size=pool_config["pool_max"],
+                timeout=pool_config["connect_timeout"],
+                command_timeout=pool_config["command_timeout"],
             )
         logger.info(
             "Pool de conexoes DB inicializado: %s:%s/%s",

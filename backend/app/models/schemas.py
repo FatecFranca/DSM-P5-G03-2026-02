@@ -141,6 +141,8 @@ class HealthResponse(BaseModel):
     banco: str | None = Field(
         default=None, description="Estado da conexao com o banco de dados."
     )
+    dataset: str = Field(description="Estado da tabela firewatch_preprocessado.")
+    dataset_registros: int | None = None
     features: list[str] | None = None
     classes: list[str] | None = None
     acerto_estimado: float | None = None
