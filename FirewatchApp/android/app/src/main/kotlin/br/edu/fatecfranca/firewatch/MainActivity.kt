@@ -1,4 +1,4 @@
-package com.example.firewatch
+package br.edu.fatecfranca.firewatch
 
 import io.flutter.embedding.android.FlutterActivity
 

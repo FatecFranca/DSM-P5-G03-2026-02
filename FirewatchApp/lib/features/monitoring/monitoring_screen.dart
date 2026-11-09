@@ -301,7 +301,7 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                       TileLayer(
                         urlTemplate:
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.firewatch',
+                        userAgentPackageName: 'br.edu.fatecfranca.firewatch',
                         tileProvider: ref.watch(mapTileProviderProvider),
                       ),
                       if (region != null)
