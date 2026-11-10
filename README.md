@@ -1,20 +1,18 @@
 # FireWatch
 
-> **Veja o risco antes do fogo.**
+> Veja o risco antes do fogo.
 
-O **FireWatch** é um projeto acadêmico de monitoramento e previsão de risco de queimadas.
-O sistema recebe as coordenadas de um local, consulta dados meteorológicos em tempo real,
-aplica um modelo de Machine Learning e devolve o nível de risco com probabilidades e
-recomendações de prevenção.
-
-O projeto é composto por um **aplicativo mobile em Flutter** e por uma **API em FastAPI**
-com uma **Regressão Logística balanceada** treinada a partir do dataset preprocessado
-em PostgreSQL.
+O **FireWatch** é um projeto acadêmico de monitoramento e previsão de risco de queimadas. A solução foi desenvolvida como Projeto Integrador do curso de Desenvolvimento de Software Multiplataforma da Fatec Franca.
 
 **Equipe:** G03 — FireWatch  
 **Curso:** Desenvolvimento de Software Multiplataforma (DSM) — Fatec Franca  
 **Projeto Integrador:** 5º semestre — 2026/2  
-**Repositório:** <https://github.com/FatecFranca/DSM-P5-G03-2026-02>
+**Repositório:** [FatecFranca/DSM-P5-G03-2026-02](https://github.com/FatecFranca/DSM-P5-G03-2026-02)
+
+[![Validação do projeto](https://github.com/FatecFranca/DSM-P5-G03-2026-02/actions/workflows/validacao.yml/badge.svg)](https://github.com/FatecFranca/DSM-P5-G03-2026-02/actions/workflows/validacao.yml)
+[![Release Android](https://img.shields.io/github/v/release/FatecFranca/DSM-P5-G03-2026-02?label=APK)](https://github.com/FatecFranca/DSM-P5-G03-2026-02/releases/latest)
+
+> **Aviso:** o FireWatch é uma ferramenta acadêmica de apoio à informação. Ele não substitui órgãos oficiais de defesa civil, bombeiros ou monitoramento ambiental. Em emergências, ligue **193 (Bombeiros)** ou **199 (Defesa Civil)**.
 
 ---
 
@@ -23,305 +21,201 @@ em PostgreSQL.
 - [Sobre o projeto](#sobre-o-projeto)
 - [Como funciona](#como-funciona)
 - [Funcionalidades](#funcionalidades)
+- [Baixe o aplicativo](#baixe-o-aplicativo)
 - [Arquitetura](#arquitetura)
 - [Tecnologias](#tecnologias)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Executando o projeto](#executando-o-projeto)
 - [Configuração do backend](#configuração-do-backend)
 - [API](#api)
-- [Modelo de Machine Learning](#modelo-de-machine-learning)
+- [Modelo de aprendizado de máquina](#modelo-de-aprendizado-de-máquina)
 - [Testes](#testes)
-- [Estado atual e próximos passos](#estado-atual-e-próximos-passos)
+- [Estado atual e limitações](#estado-atual-e-limitações)
 - [Equipe](#equipe)
 
 ---
 
 ## Sobre o projeto
 
-Queimadas e incêndios florestais causam impactos ambientais, econômicos e à saúde da
-população. O FireWatch foi desenvolvido para facilitar o acesso a uma estimativa de risco
-antes que uma ocorrência aconteça.
+Queimadas e incêndios florestais causam impactos ambientais, econômicos e à saúde da população. O FireWatch foi desenvolvido para facilitar o acesso a uma estimativa de risco antes que uma ocorrência aconteça.
 
-A partir de uma latitude e longitude, o sistema:
+A partir de uma localização escolhida pela pessoa usuária, o sistema:
 
-1. consulta a **Open-Meteo** para obter as condições atuais e o histórico recente de chuva;
-2. transforma os dados meteorológicos nas features usadas pelo modelo;
-3. aplica uma **Regressão Logística balanceada** treinada com dados históricos de risco;
-4. retorna a classe de risco — **Baixo**, **Moderado** ou **Crítico** —, as probabilidades de
-   cada classe, uma cor de alerta e uma recomendação;
-5. apresenta o resultado no aplicativo, junto com os dados climáticos que sustentam a previsão.
+1. consulta condições meteorológicas atuais e o histórico recente de precipitação;
+2. transforma os dados nas variáveis esperadas pelo modelo;
+3. aplica uma Regressão Logística com balanceamento de classes;
+4. classifica o risco como **Baixo**, **Moderado** ou **Crítico**;
+5. apresenta probabilidades, condições climáticas e uma recomendação de prevenção no aplicativo.
 
-> **Aviso:** o FireWatch é uma ferramenta acadêmica de apoio à informação. Ele não substitui
-> os órgãos oficiais de defesa civil, bombeiros ou monitoramento ambiental. Em emergências,
-> ligue **193 (Bombeiros)** ou **199 (Defesa Civil)**.
-
----
+O projeto reúne um aplicativo Android em Flutter, uma API em FastAPI, um banco PostgreSQL com o histórico oficial e um modelo de aprendizado de máquina. A aplicação está disponível de ponta a ponta e possui uma versão Android assinada.
 
 ## Como funciona
 
 ```mermaid
 flowchart LR
-    A[App Flutter] -->|GPS ou coordenadas manuais| B[POST /api/v1/prever-risco]
-    B --> C[API FastAPI]
-    C -->|Clima atual + 60 dias de chuva| D[Open-Meteo]
-    C --> E[Features meteorológicas]
-    E --> F[modelo logístico - artefato joblib]
-    F --> G[Classe + probabilidades + recomendação]
-    G --> A
-    C -->|Consultas históricas / health| H[(PostgreSQL)]
-    A -->|Nome da cidade| I[Nominatim]
-    A -->|Mapa| J[Tiles OpenStreetMap]
+    U["Pessoa usuária"] --> A["Aplicativo Flutter"]
+    A --> L["GPS, cidade, coordenadas ou mapa"]
+    A --> M["OpenStreetMap e Nominatim"]
+    A -->|HTTPS| N["Nginx"]
+    N --> API["API FastAPI"]
+    API --> W["Open-Meteo"]
+    W --> F["Engenharia de variáveis"]
+    F --> ML["Modelo de Regressão Logística"]
+    ML --> R["Classe, probabilidades e recomendação"]
+    R --> A
+    API --> PG[("PostgreSQL")]
 ```
 
-Fluxo resumido:
-
-```text
-GPS / coordenadas
-        ↓
-Open-Meteo (clima atual + histórico de precipitação)
-        ↓
-Engenharia de features (4 variáveis)
-        ↓
-Regressão Logística (3 classes de risco)
-        ↓
-Risco Baixo / Moderado / Crítico + probabilidades + recomendação
-        ↓
-Aplicativo Flutter
-```
-
----
+O aplicativo nunca acessa o PostgreSQL diretamente. A API concentra as regras de negócio, a validação das entradas, as consultas ao banco e a execução do modelo.
 
 ## Funcionalidades
 
-### Aplicativo mobile
+### Aplicativo Android
 
-- **Splash screen** com identidade visual do projeto.
-- **Onboarding de localização** com duas opções:
-  - solicitar a localização do aparelho via GPS (`geolocator`);
-  - informar latitude e longitude manualmente.
-- **Tela de monitoramento** (aba "Início"):
-  - mapa interativo com tiles do OpenStreetMap centrado nas coordenadas informadas;
-  - nome da cidade/estado obtido por geocodificação reversa (Nominatim);
-  - painel com temperatura, umidade, precipitação e vento;
-  - botão **"Verificar risco aqui"**, que consulta a API real e exibe o resultado.
-- **Previsão** com gráficos de temperatura, umidade e evolução do risco por hora e por dia.
-- **Mapa de risco** com filtros por nível, legenda e pontos ilustrativos.
-- **Alertas** com filtros por severidade e marcação de lidos/não lidos.
-- **Prevenção** com orientações de segurança e telefones de emergência.
-- **Configurações** de tema claro/escuro, localização e preferências de notificação.
-- **Detalhes do risco** com fatores relacionados e gráfico de evolução estimada.
-- Suporte a **tema claro e escuro**.
-
-> As telas de previsão, mapa de risco, alertas, prevenção e detalhes do risco ainda usam
-> dados demonstrativos. A integração real com a API está implementada no onboarding de
-> coordenadas e na tela de monitoramento.
+- seleção da localização por GPS, busca de cidade, coordenadas ou toque no mapa;
+- consulta pontual de risco com temperatura, umidade, precipitação e vento;
+- análise regional experimental com até nove zonas;
+- mapa interativo baseado no OpenStreetMap;
+- orientação baseada na última consulta real, sem alertas fictícios;
+- conteúdo de prevenção e contatos de emergência;
+- temas claro e escuro;
+- estados de carregamento, indisponibilidade e nova tentativa;
+- layouts responsivos e recursos de acessibilidade.
 
 ### Backend
 
-- API REST com **FastAPI** e documentação automática em `/docs` e `/redoc`.
-- Endpoint de predição a partir de latitude/longitude.
-- Consulta à **Open-Meteo** com:
-  - cache em memória por coordenada;
-  - timeout configurável;
-  - repetição automática em falhas de rede e erros `5xx`;
-  - modo de fallback offline opcional para desenvolvimento.
-- Validação de coordenadas com **Pydantic**.
-- Classificação em três níveis com probabilidades, cor e recomendação.
-- Health check com estado do modelo e do banco de dados.
-- Dataset histórico oficial consultável com filtros, paginação e estatísticas.
-- Pool de conexões assíncrono com **asyncpg**.
-- CORS configurável por variáveis de ambiente.
-- Modelo logístico balanceado validado temporalmente em setembro de 2024.
+- API assíncrona com FastAPI;
+- consulta meteorológica à Open-Meteo;
+- classificação em Risco Baixo, Moderado ou Crítico;
+- probabilidades, cor de alerta e recomendação para cada resultado;
+- análise regional limitada ao território brasileiro;
+- cache meteorológico, timeout, repetição controlada e limitação de requisições;
+- verificação de saúde do serviço, modelo, banco e dataset;
+- filtros, paginação e estatísticas do histórico;
+- pool de conexões PostgreSQL dimensionado para uma VM de baixo custo.
 
----
+### Dados e aprendizado de máquina
+
+- 157.682 registros históricos entre 1º de janeiro e 9 de setembro de 2024;
+- dataset oficial preservado no PostgreSQL sem reclassificação durante a importação;
+- importação validada, transacional e segura para reexecução;
+- Regressão Logística com balanceamento de classes;
+- validação do artefato do modelo antes da primeira previsão.
+
+O dataset e o artefato do modelo não ficam no Git. Cada ambiente recebe esses arquivos separadamente por um canal seguro.
+
+## Baixe o aplicativo
+
+A versão atual é distribuída como Android Package Kit (APK) e requer Android 7.0 ou superior:
+
+- [Baixar o APK do FireWatch](https://github.com/FatecFranca/DSM-P5-G03-2026-02/releases/download/v1.0.0/firewatch-v1.0.0.apk)
+- [Consultar as notas da versão](https://github.com/FatecFranca/DSM-P5-G03-2026-02/releases/tag/v1.0.0)
+
+O APK de produção se comunica com a API por HTTPS. A máquina virtual da Azure opera sob demanda para reduzir custos. Quando ela está desalocada, o aplicativo abre normalmente, mas não consegue realizar novas consultas de risco.
 
 ## Arquitetura
 
-O repositório é dividido em dois projetos independentes:
+O repositório possui dois projetos principais:
 
 | Projeto | Responsabilidade |
 | --- | --- |
-| `FirewatchApp/` | Aplicativo mobile em Flutter/Dart |
-| `backend/` | API FastAPI, integração com Open-Meteo, acesso ao PostgreSQL e pipeline de ML |
+| `FirewatchApp/` | Aplicativo Android desenvolvido em Flutter e Dart |
+| `backend/` | API FastAPI, integração meteorológica, acesso ao PostgreSQL e inferência do modelo |
 
-O aplicativo não acessa o banco de dados diretamente. Credenciais e regras de negócio ficam
-exclusivamente no backend. A comunicação ocorre por HTTPS com a API, e a API utiliza a
-Open-Meteo e o modelo local para produzir a resposta.
+### Ambiente de produção
 
-A URL reservada para o ambiente de produção é:
+A implantação usa uma única máquina virtual Ubuntu na Microsoft Azure para manter a solução simples e econômica:
 
-```text
-https://firewatch-api-iago-2026.chilecentral.cloudapp.azure.com
-```
+| Componente | Responsabilidade |
+| --- | --- |
+| Nginx | HTTPS, proxy reverso, cabeçalhos de segurança e limites de acesso |
+| FastAPI e Uvicorn | API e execução do modelo |
+| PostgreSQL | Dataset histórico e consultas agregadas |
+| systemd | Inicialização e recuperação automática dos serviços |
 
----
+O PostgreSQL aceita conexões apenas no endereço local da VM. A internet acessa somente os serviços web necessários, e o acesso administrativo é restrito.
+
+O deploy não acompanha automaticamente cada alteração no GitHub. Mudanças no backend precisam ser implantadas e validadas explicitamente antes da reinicialização do serviço.
 
 ## Tecnologias
 
-### Mobile
-
-| Tecnologia | Uso |
+| Camada | Tecnologias |
 | --- | --- |
-| **Flutter / Dart** (`SDK >= 3.10`) | Desenvolvimento do aplicativo |
-| **Riverpod** | Gerenciamento de estado |
-| **go_router** | Navegação e rotas |
-| **flutter_map + latlong2** | Mapa interativo |
-| **geolocator** | Localização por GPS |
-| **http** | Consumo da API |
-| **google_fonts / flutter_svg** | Tipografia e ícones vetoriais |
-
-### Backend e Machine Learning
-
-| Tecnologia | Uso |
-| --- | --- |
-| **Python 3.11+** (validado em 3.13) | Linguagem do backend |
-| **FastAPI + Uvicorn** | API HTTP assíncrona |
-| **Pydantic v2** | Validação e schemas |
-| **asyncpg** | Acesso assíncrono ao PostgreSQL |
-| **httpx** | Cliente HTTP para a Open-Meteo |
-| **scikit-learn** | Regressão Logística, padronização e métricas |
-| **pandas / numpy / scipy** | Manipulação e análise dos dados |
-| **joblib** | Carregamento do modelo logístico (`*.joblib`) |
-| **python-dotenv** | Carregamento do arquivo `.env` |
-| **pytest** | Testes automatizados |
-
-### Serviços externos
-
-| Serviço | Uso |
-| --- | --- |
-| **Open-Meteo** | Clima atual e histórico de precipitação |
-| **Nominatim (OpenStreetMap)** | Geocodificação reversa de coordenadas |
-| **OpenStreetMap** | Tiles do mapa na tela de monitoramento |
-| **PostgreSQL** | Dataset de treinamento e diagnóstico de conexão |
-
-Nenhum desses serviços exige chave de API para as funcionalidades utilizadas.
-
----
+| Aplicativo | Flutter, Dart, Riverpod, go_router, flutter_map e geolocator |
+| API | Python, FastAPI, Uvicorn, Pydantic, HTTPX e asyncpg |
+| Aprendizado de máquina | scikit-learn, pandas, NumPy, SciPy e joblib |
+| Dados | PostgreSQL |
+| Produção | Ubuntu, Nginx, systemd, Let's Encrypt e Microsoft Azure |
+| Qualidade | pytest, Flutter Test, Ruff e GitHub Actions |
 
 ## Estrutura do repositório
 
 ```text
 DSM-P5-G03-2026-02/
+├── .github/workflows/       # Validação contínua
 ├── backend/
-│   ├── app/
-│   │   ├── main.py                 # Criação da API, health check e lifespan
-│   │   ├── config.py               # Configurações via variáveis de ambiente
-│   │   ├── db.py                   # Pool de conexões PostgreSQL
-│   │   ├── models/                 # Schemas de entrada e saída
-│   │   ├── routes/dataset.py       # Consulta ao dataset histórico
-│   │   ├── routes/risk.py          # Endpoint /api/v1/prever-risco
-│   │   └── services/
-│   │       ├── weather_service.py  # Integração com a Open-Meteo
-│   │       ├── prediction_service.py # Carga e execução do modelo
-│   │       └── classificacao.py    # Recomendações e rótulos de risco
-│   ├── ml/
-│   │   ├── alvo.py                 # Definição das classes e cortes
-│   │   ├── dados.py                # Leitura do dataset no PostgreSQL
-│   │   ├── features.py             # Engenharia de features
-│   │   ├── treinamento.py          # Pipeline legado, não usado no deploy
-│   │   ├── avaliacao.py            # Avaliação e cenários climáticos
-│   │   └── modelo_risco_fogo_logistica.joblib # Artefato externo ao Git
-│   ├── tests/
-│   │   ├── test_api.py
-│   │   └── test_fallback.py
-│   ├── requirements.txt
-│   ├── migrations/                 # Schema PostgreSQL versionado
-│   ├── scripts/                    # Migration e importação reproduzível
-│   ├── ruff.toml
-│   └── .env.example
-└── FirewatchApp/
-    ├── lib/
-    │   ├── main.dart
-    │   ├── app.dart
-    │   ├── config/                 # URL da API e ambientes
-    │   ├── core/                   # Tema, modelos, roteador e providers
-    │   ├── features/               # Telas por funcionalidade
-    │   ├── services/               # API, localização e geocodificação
-    │   └── shared/widgets/         # Componentes reutilizáveis
-    ├── test/
-    │   ├── api_service_test.dart
-    │   └── widget_test.dart
-    ├── pubspec.yaml
-    └── README.md
+│   ├── app/                 # API, rotas, modelos e serviços
+│   ├── docs/                # Documentação técnica do backend
+│   ├── migrations/          # Estrutura versionada do PostgreSQL
+│   ├── ml/                  # Pipeline e contrato do modelo
+│   ├── scripts/             # Migração e importação do dataset
+│   └── tests/               # Testes do backend
+├── FirewatchApp/
+│   ├── android/             # Configuração da plataforma Android
+│   ├── lib/                 # Código do aplicativo Flutter
+│   └── test/                # Testes do aplicativo
+└── README.md
 ```
-
----
 
 ## Executando o projeto
 
 ### Pré-requisitos
 
-- **Flutter** 3.x com Dart `>= 3.10`
-- **Python** 3.11 ou superior
-- **PostgreSQL** (necessário para treinar o modelo e testar a conexão com o banco)
-- Um emulador ou dispositivo para executar o aplicativo
+- Python 3.11 ou superior;
+- PostgreSQL 16 ou compatível;
+- Flutter com uma versão compatível com o projeto;
+- dataset preprocessado em formato CSV;
+- artefato compatível do modelo em formato joblib.
 
-O backend consegue iniciar em modo degradado sem o banco disponível. O endpoint de predição
-também exige o artefato `modelo_risco_fogo_logistica.joblib`, gerado pelo trabalho de Machine
-Learning. Ele é ignorado pelo Git e deve ser transferido separadamente para cada ambiente.
+### Backend
 
-### 1. Backend
-
-No Windows:
-
-```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-copy .env.example .env
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-No Linux/macOS:
+Crie o ambiente virtual e instale as dependências:
 
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 cp .env.example .env
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Depois de iniciar:
+Configure o `.env` com a conexão PostgreSQL e o caminho do modelo. Não versione esse arquivo.
 
-- API: <http://127.0.0.1:8000>
-- Documentação Swagger: <http://127.0.0.1:8000/docs>
-- Health check: <http://127.0.0.1:8000/health>
-
-Edite o arquivo `backend/.env` com as credenciais do seu PostgreSQL antes de usar os
-endpoints que dependem do banco ou de treinar o modelo.
-
-### 2. Dataset histórico no PostgreSQL
-
-Com o PostgreSQL iniciado e o `.env` configurado, aplique o schema e importe o arquivo
-oficial. O caminho do CSV é configurável; o importador valida o cabeçalho e cada valor,
-processa em lotes e pode ser reexecutado sem duplicar registros:
+Crie o schema e importe o dataset:
 
 ```bash
-cd backend
 python -m scripts.aplicar_migrations
 python -m scripts.importar_dataset \
-  --arquivo "/caminho/para/firewatch_preprocessado.csv"
+  --arquivo "/caminho/para/dataset_preprocessado.csv"
 ```
 
-O arquivo esperado possui as colunas `linha_origem`, `data`, `municipio`, `estado`, `bioma`,
-`avg_numero_dias_sem_chuva`, `avg_precipitacao`, `avg_risco_fogo`, `avg_frp` e
-`bioma_ausente_original`, nessa ordem. O dataset não é versionado no Git. Na implantação,
-ele deve ser transferido separadamente para a VM, importado no PostgreSQL e pode ser removido
-da VM depois da conferência da importação e do backup.
+Inicie a API:
 
-### 3. Modelo de Machine Learning
-
-O backend não retreina o modelo durante a instalação. Transfira o artefato final por canal
-seguro e configure seu caminho no `.env`:
-
-```dotenv
-MODEL_PATH=/opt/firewatch/modelo_risco_fogo_logistica.joblib
+```bash
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### 4. Aplicativo Flutter
+Depois da inicialização, acesse:
+
+- API local: [http://127.0.0.1:8000](http://127.0.0.1:8000);
+- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs);
+- verificação de saúde: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health).
+
+O backend inicia em modo degradado quando o banco ou o modelo não estão disponíveis. Os endpoints dependentes desses componentes informam a indisponibilidade sem inventar resultados.
+
+### Aplicativo Flutter
+
+Instale as dependências e inicie o aplicativo:
 
 ```bash
 cd FirewatchApp
@@ -329,175 +223,70 @@ flutter pub get
 flutter run
 ```
 
-Na fase de integração mobile, configure a API de produção em
-`FirewatchApp/lib/config/env_config.dart` com:
+O build padrão usa a API de produção por HTTPS. Para usar o backend local no emulador Android:
 
-```dart
-static const String apiBaseUrl =
-    'https://firewatch-api-iago-2026.chilecentral.cloudapp.azure.com';
+```bash
+flutter run \
+  --dart-define=APP_ENVIRONMENT=development \
+  --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
-Para usar um backend local, altere essa constante para o endereço correspondente:
-
-```dart
-// Emulador Android
-static const String apiBaseUrl = 'http://10.0.2.2:8000';
-
-// Simulador iOS, desktop ou dispositivo físico na mesma rede
-static const String apiBaseUrl = 'http://localhost:8000';
-```
-
-> Em dispositivos físicos, use o IP da máquina na rede local em vez de `localhost`.
-> Para HTTP sem TLS, pode ser necessário ajustar a configuração de segurança de rede
-> da plataforma.
-
----
+Em um dispositivo físico, substitua `10.0.2.2` pelo endereço da máquina na rede local. Builds de produção aceitam apenas a API HTTPS configurada.
 
 ## Configuração do backend
 
-As configurações são carregadas de `backend/.env` por `pydantic-settings` e
-`python-dotenv`. Use `backend/.env.example` como base.
+Copie `backend/.env.example` e ajuste somente os valores necessários:
 
-| Variável | Padrão | Descrição |
-| --- | --- | --- |
-| `OPEN_METEO_URL` | `https://api.open-meteo.com/v1/forecast` | URL da API de clima |
-| `OPEN_METEO_TIMEOUT` | `10` | Timeout das requisições, em segundos |
-| `CACHE_TTL_SEGUNDOS` | `300` | Tempo de cache do clima por coordenada |
-| `PERMITIR_FALLBACK_CLIMA` | `false` | Usa estimativa offline quando a Open-Meteo falha |
-| `CORS_ORIGINS` | vazio | Origens web explícitas, separadas por vírgula; sem curingas |
-| `RISK_RATE_PER_MINUTE` | `60` | Consultas pontuais por IP/minuto em cada processo |
-| `REGIONAL_RATE_PER_MINUTE` | `6` | Consultas regionais por IP/minuto em cada processo |
-| `DB_HOST` | `localhost` | Host do PostgreSQL |
-| `DB_PORT` | `5432` | Porta do PostgreSQL |
-| `DB_NAME` | `firewatch_db` | Nome do banco |
-| `DB_USER` | `postgres` | Usuário do banco |
-| `DB_PASSWORD` | vazio | Senha do banco |
-| `DB_POOL_MIN` | `1` | Mínimo de conexões no pool |
-| `DB_POOL_MAX` | `5` | Máximo de conexões no pool |
-| `DB_CONNECT_TIMEOUT` | `10` | Timeout para obter/conectar ao banco, em segundos |
-| `DB_COMMAND_TIMEOUT` | `30` | Timeout padrão das consultas, em segundos |
-| `MODEL_PATH` | vazio | Caminho do artefato logístico externo ao Git |
+| Variável | Finalidade |
+| --- | --- |
+| `MODEL_PATH` | Caminho local do artefato do modelo |
+| `DB_HOST`, `DB_PORT` e `DB_NAME` | Destino do PostgreSQL |
+| `DB_USER` e `DB_PASSWORD` | Credenciais do banco |
+| `DB_POOL_MIN` e `DB_POOL_MAX` | Limites do pool de conexões |
+| `OPEN_METEO_TIMEOUT` | Timeout da consulta meteorológica |
+| `CACHE_TTL_SEGUNDOS` | Validade do cache meteorológico |
+| `PERMITIR_FALLBACK_CLIMA` | Fallback exclusivo para desenvolvimento |
+| `CORS_ORIGINS` | Origens web autorizadas |
+| `RISK_RATE_PER_MINUTE` | Limite da previsão pontual |
+| `REGIONAL_RATE_PER_MINUTE` | Limite da análise regional |
 
-> O fallback climático é destinado a desenvolvimento e demonstrações offline. Em produção,
-> mantenha `PERMITIR_FALLBACK_CLIMA=false` para não mascarar indisponibilidades da fonte real.
-
----
+Mantenha `PERMITIR_FALLBACK_CLIMA=false` em produção para não apresentar estimativas locais como dados meteorológicos reais.
 
 ## API
 
-### Endpoints
-
 | Método | Endpoint | Descrição |
 | --- | --- | --- |
-| `GET` | `/` | Informações gerais da API |
-| `GET` | `/health` | Estado do serviço, do modelo e do banco |
-| `POST` | `/api/v1/prever-risco` | Predição de risco para uma coordenada |
-| `POST` | `/api/v1/risco-regional` | Até nove zonas de risco com recorte territorial e cache |
-| `GET` | `/api/v1/dados` | Registros históricos filtrados e paginados |
-| `GET` | `/api/v1/dados/estatisticas` | Agregações do dataset histórico |
-| `GET` | `/docs` | Documentação Swagger UI |
-| `GET` | `/redoc` | Documentação ReDoc |
-| `GET` | `/openapi.json` | Especificação OpenAPI |
+| `GET` | `/` | Identificação e rotas principais |
+| `GET` | `/health` | Estado da API, modelo, banco e dataset |
+| `POST` | `/api/v1/prever-risco` | Risco pontual por coordenadas |
+| `POST` | `/api/v1/risco-regional` | Amostragem regional com até nove zonas |
+| `GET` | `/api/v1/dados` | Histórico filtrado e paginado |
+| `GET` | `/api/v1/dados/estatisticas` | Estatísticas do dataset |
+| `GET` | `/docs` | Swagger UI |
+| `GET` | `/redoc` | ReDoc |
 
-### Exemplo de requisição
+Exemplo de previsão em um backend local:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/prever-risco \
-  -H "Content-Type: application/json" \
-  -d '{"latitude": -20.5386, "longitude": -47.4008}'
+curl --request POST http://127.0.0.1:8000/api/v1/prever-risco \
+  --header "Content-Type: application/json" \
+  --data '{"latitude":-20.5386,"longitude":-47.4008}'
 ```
 
-### Exemplo de resposta
+A API retorna as condições meteorológicas, a classe prevista, as probabilidades das três classes, uma cor de alerta e uma recomendação.
 
-```json
-{
-  "status": "sucesso",
-  "localizacao": {
-    "latitude": -20.5386,
-    "longitude": -47.4008
-  },
-  "dados_climaticos": {
-    "temperatura": 31.0,
-    "umidade_ar": 25.0,
-    "precipitacao_mm": 0.0,
-    "vento_kmh": 18.0
-  },
-  "predicao": {
-    "probabilidade": 0.87,
-    "porcentagem": "87.0%",
-    "nivel_risco": "CRÍTICO",
-    "classe": "Risco Crítico",
-    "cor_alerta": "#DC2626",
-    "recomendacao": "Alerta máximo. Evite qualquer tipo de queimada de manejo e reporte focos de fumaça à Defesa Civil.",
-    "probabilidades": {
-      "risco_baixo": 0.02,
-      "risco_moderado": 0.11,
-      "risco_critico": 0.87
-    }
-  }
-}
-```
+## Modelo de aprendizado de máquina
 
-> Valores ilustrativos. A resposta real varia conforme as condições meteorológicas do local
-> e o resultado do modelo.
+O FireWatch utiliza uma Regressão Logística com balanceamento de classes. O modelo recebe quatro variáveis:
 
-### Códigos de erro relevantes
+- média do número de dias sem chuva;
+- precipitação estimada em milímetros;
+- componente seno do dia do ano;
+- componente cosseno do dia do ano.
 
-| Status | Situação |
-| --- | --- |
-| `422` | Coordenadas ausentes, inválidas ou fora dos limites |
-| `503` | Open-Meteo indisponível ou modelo não carregado |
+O histórico oficial contém 157.682 registros entre 1º de janeiro e 9 de setembro de 2024 e é armazenado na tabela `firewatch_preprocessado`. A importação preserva os valores finais do dataset, sem recalcular sua classificação.
 
----
-
-## Modelo de Machine Learning
-
-### Dataset histórico oficial
-
-A tabela `firewatch_preprocessado` mantém os 157.682 registros oficiais de 1º de janeiro a
-9 de setembro de 2024. A importação preserva os valores finais sem recalcular classes.
-
-### Variáveis de entrada
-
-| Feature | Descrição |
-| --- | --- |
-| `avg_numero_dias_sem_chuva` | Quantidade média de dias sem chuva |
-| `precipitacao_mm_estimada` | Precipitação convertida para milímetros |
-| `dia_ano_seno` | Componente sazonal seno do dia do ano |
-| `dia_ano_cosseno` | Componente sazonal cosseno do dia do ano |
-
-A ordem das features de inferência é definida em `backend/ml/modelo_logistico.py` e validada
-contra os metadados armazenados no artefato.
-
-### Classes de risco
-
-O alvo é derivado do percentil de `risco_fogo`, convertido em um índice de **0 a 100** e
-dividido em três classes:
-
-| Índice | Classe | Nível na API | Cor |
-| --- | --- | --- | --- |
-| `0 – 29,9` | Risco Baixo | `BAIXO` | `#22C55E` |
-| `30 – 69,9` | Risco Moderado | `MODERADO` | `#FACC15` |
-| `70 – 100` | Risco Crítico | `CRÍTICO` | `#DC2626` |
-
-Os cortes oficiais ficam em `backend/ml/alvo.py` e são compartilhados por treinamento,
-avaliação e API.
-
-### Treinamento
-
-- Algoritmo: `LogisticRegression` com `class_weight="balanced"`
-- Pré-processamento: preenchimento pela mediana e `StandardScaler`
-- `random_state`: `42`
-- Confirmação temporal: registros de 1 a 9 de setembro de 2024
-- Acurácia: `84,32%`
-- Acurácia balanceada: `52,99%`
-- F1 macro: `52,93%`
-- Recall da classe Crítico: `91,99%`
-
-O artefato final é `modelo_risco_fogo_logistica.joblib`. O backend apenas valida e executa
-esse artefato; o processo científico permanece no projeto de Machine Learning.
-
----
+O artefato treinado é externo ao Git. O backend valida sua compatibilidade antes de aceitar previsões e não realiza retreinamento durante a inicialização ou o deploy.
 
 ## Testes
 
@@ -505,65 +294,46 @@ esse artefato; o processo científico permanece no projeto de Machine Learning.
 
 ```bash
 cd backend
+source .venv/bin/activate
 python -m pytest -q
 ```
 
-Os testes reais com o PostgreSQL importado são opt-in para manter a suíte unitária portátil:
+O teste de integração com o dataset importado é opcional e exige um PostgreSQL configurado:
 
 ```bash
-FIREWATCH_TEST_DATABASE=1 python -m pytest -q tests/test_dataset_integration.py
+FIREWATCH_TEST_DATABASE=1 \
+  python -m pytest -q tests/test_dataset_integration.py
 ```
-
-A suíte cobre:
-
-- engenharia e normalização das features;
-- definição das classes, cortes e rótulos;
-- respostas da API, validação de coordenadas e documentação;
-- validação, importação, filtros, paginação e estatísticas do dataset histórico;
-- consistência entre classe prevista e probabilidades;
-- cache, timeout, retry e fallback da Open-Meteo;
-- endpoints de health e teste de banco.
 
 ### Aplicativo
 
 ```bash
 cd FirewatchApp
+dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
 ```
 
-Os testes cobrem:
+O workflow de validação executa as suítes do backend e do aplicativo em cada push e pull request.
 
-- navegação da splash para o onboarding e entre as abas;
-- preenchimento manual de coordenadas;
-- abertura da tela de monitoramento com dados simulados da API;
-- mensagens de erro quando a API falha;
-- timeout, falhas de rede e respostas inválidas no cliente HTTP.
-
----
-
-## Estado atual e próximos passos
+## Estado atual e limitações
 
 ### Implementado
 
-- Backend FastAPI com predição real e documentação automática.
-- Integração com Open-Meteo, cache, retry e fallback configurável.
-- Modelo logístico externo ao Git, validado e carregado pela API.
-- Aplicativo Flutter com onboarding por GPS ou coordenadas manuais.
-- Tela de monitoramento com mapa, clima atual e risco real.
-- Testes automatizados no backend e no aplicativo.
+- aplicativo Android integrado à API de produção;
+- API FastAPI com predição pontual e regional;
+- PostgreSQL com o dataset histórico oficial;
+- comunicação pública protegida por HTTPS;
+- APK de produção assinado e publicado no GitHub Releases;
+- validação automatizada do backend e do aplicativo.
 
-### Em evolução
+### Limitações e uso responsável
 
-- Substituir os dados demonstrativos das telas de previsão, alertas e mapa de risco por
-  dados reais.
-- Persistir preferências e alertas do usuário.
-- Implementar notificações push.
-- Ampliar a cobertura de testes de interface.
-- Adicionar autenticação e histórico de consultas.
-- Automatizar o deploy e a integração contínua.
-
----
+- a classificação é uma estimativa acadêmica, não uma confirmação de incêndio;
+- a análise regional usa previsões pontuais e não representa um perímetro de fogo;
+- a aba de alertas apresenta a última consulta da sessão e não envia notificações push;
+- a disponibilidade depende da VM e dos serviços externos utilizados;
+- os tiles públicos do OpenStreetMap atendem ao contexto acadêmico atual, não a uma operação de grande escala.
 
 ## Equipe
 
@@ -571,12 +341,11 @@ Os testes cobrem:
 
 | Integrante |
 | --- |
-| **Iago Pinheiro Rodrigues** |
-| **Kaio Leandro Rissato** |
-| **Pedro Henrique Xavier Constancio** |
+| Iago Pinheiro Rodrigues |
+| Kaio Leandro Rissato |
+| Pedro Henrique Xavier Constancio |
 
-Projeto desenvolvido para o **Projeto Integrador do 5º semestre** do curso de
-**Desenvolvimento de Software Multiplataforma (DSM)** da **Fatec Franca**, turma **2026/2**.
+Projeto desenvolvido para o **Projeto Integrador do 5º semestre** do curso de **Desenvolvimento de Software Multiplataforma (DSM)** da **Fatec Franca**, turma **2026/2**.
 
 ---
 
